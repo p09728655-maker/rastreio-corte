@@ -171,7 +171,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
-      <div class="sec-sub">Informe a <b>data-meta</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.</div>
+      <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
         <span id="prog-info" class="prog-info"></span>
@@ -335,18 +335,18 @@ function statusFor(lote){
   const dias = [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
   const last = dias.length? dias[dias.length-1] : null;
   const first = dias.length? dias[0] : null;
-  let cls="b-mute", txt="Sem meta", delta="";
+  let cls="b-mute", txt="Sem data", delta="";
   if(prazo){
-    if(last && last>prazo){ cls="b-red"; txt="Atrasado"; delta="+"+daysBetween(last,prazo)+"d"; }
-    else if(prazo>=todayMidday()){ cls="b-warn"; txt="Em andamento"; delta=daysBetween(prazo,todayMidday())+"d p/ meta"; }
-    else { cls="b-ok"; txt="No prazo"; if(last) delta="−"+Math.abs(daysBetween(prazo,last))+"d"; }
+    if(last && last>prazo){ cls="b-red"; txt="Atrasado"; const d=daysBetween(last,prazo); delta=d+(d===1?" dia atrasado":" dias atrasado"); }
+    else if(prazo>=todayMidday()){ cls="b-warn"; txt="Em andamento"; const d=daysBetween(prazo,todayMidday()); delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia":" dias")); }
+    else { cls="b-ok"; txt="No prazo"; if(last){ const d=Math.abs(daysBetween(prazo,last)); delta=d===0?"cortado no dia":(d+(d===1?" dia adiantado":" dias adiantado")); } }
   }
   return {iso,prazo,first,last,cls,txt,delta,src:meta.src};
 }
 
 function renderPrazo(){
   const t=document.getElementById("tbl-prazo");
-  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1ª data</th><th>Última data</th><th class='l'>Data-meta (prazo)</th><th>Δ dias</th><th class='l'>Status</th></tr></thead><tbody>";
+  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1º corte</th><th>Último corte</th><th class='l'>Data programada</th><th class='l'>Prazo</th><th class='l'>Status</th></tr></thead><tbody>";
   for(const lote of AGG.lotes){
     const s=statusFor(lote);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
@@ -356,7 +356,7 @@ function renderPrazo(){
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
       <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
-      <td class='num'>${s.delta||"—"}</td>
+      <td class='l' style='color:var(--txt2)'>${s.delta||"—"}</td>
       <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
     </tr>`;
   }
@@ -491,8 +491,8 @@ function exportCsv(){
   for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), AGG.dataT[d]]); }
   rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.grand]);
   rows.push([]);
-  rows.push(["Lote","Cortado","Data-meta","Status"]);
-  for(const l of AGG.lotes){ const s=statusFor(l); rows.push([l, AGG.loteT[l], s.iso?dateToBR(s.prazo):"", s.txt]); }
+  rows.push(["Lote","Cortado","Data programada","Prazo","Status"]);
+  for(const l of AGG.lotes){ const s=statusFor(l); rows.push([l, AGG.loteT[l], s.iso?dateToBR(s.prazo):"", s.delta, s.txt]); }
   const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="consolidacao_corte.csv"; a.click();
