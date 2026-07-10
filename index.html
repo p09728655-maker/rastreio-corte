@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rastreio do Corte · Patrimar</title>
 <meta name="theme-color" content="#0A0A0B">
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icon-192.png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script src="/xlsx.full.min.js"></script>
+<script src="xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#111111; --surface:#1C1C1C; --elevated:#222222; --border:#2A2A2A;
@@ -37,7 +37,7 @@ header{display:flex;align-items:center;gap:14px;height:54px;padding:0 18px;backg
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-main{flex:1;padding:20px;max-width:1200px;width:100%;margin:0 auto}
+main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
 
 /* Drop zone */
 #drop{border:1.5px dashed var(--border);border-radius:12px;background:var(--surface);
@@ -84,6 +84,26 @@ th.l,td.l{text-align:left}
 td{padding:9px 14px;border-bottom:.5px solid var(--border);text-align:right;white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#191919}
+
+/* ---- colunas congeladas (Data à esquerda, Total à direita) p/ tabelas largas ---- */
+#tbl-matriz td:first-child,#tbl-func td:first-child,#tbl-prazo td:first-child{
+  position:sticky;left:0;background:var(--surface);z-index:1;
+  box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-matriz th:first-child,#tbl-func th:first-child,#tbl-prazo th:first-child{
+  position:sticky;left:0;background:var(--elevated);z-index:3;
+  box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-matriz td:last-child,#tbl-func td:last-child{
+  position:sticky;right:0;background:var(--surface);z-index:1;
+  box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-matriz th:last-child,#tbl-func th:last-child{
+  position:sticky;right:0;background:var(--elevated);z-index:3;
+  box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
+/* linha de total: manter fundo elevado nas células congeladas, acima das demais */
+#tbl-matriz .trtot td:first-child,#tbl-func .trtot td:first-child,
+#tbl-matriz .trtot td:last-child,#tbl-func .trtot td:last-child{background:var(--elevated);z-index:2}
+/* hover casa o fundo das células congeladas */
+#tbl-matriz tbody tr:hover td:first-child,#tbl-func tbody tr:hover td:first-child,#tbl-prazo tbody tr:hover td:first-child,
+#tbl-matriz tbody tr:hover td:last-child,#tbl-func tbody tr:hover td:last-child{background:#191919}
 td.num{font-family:var(--font-d)}
 td.zero{color:var(--txt3)}
 .trtot td{background:var(--elevated);font-weight:700;font-family:var(--font-d);border-top:1px solid var(--border)}
@@ -100,6 +120,10 @@ td.zero{color:var(--txt3)}
 input[type=date]{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:5px 8px;border-radius:5px;color-scheme:dark}
 input[type=date]:focus{outline:none;border-color:var(--acc)}
+.prazo-actions{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.prog-info{font-family:var(--font-d);font-size:11px;color:var(--txt2)}
+.src-prog{display:inline-block;font-family:var(--font-d);font-size:8px;letter-spacing:.5px;color:var(--acc);
+  border:.5px solid rgba(255,92,31,.4);border-radius:4px;padding:1px 4px;margin-left:6px;vertical-align:middle}
 
 footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--font-d);font-size:10px;
   text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border)}
@@ -110,7 +134,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 </head>
 <body>
 <header>
-  <img class="hdr-logo" src="/patrimar-logo.png" alt="Patrimar móveis" onerror="this.style.display='none'">
+  <img class="hdr-logo" src="patrimar-logo.png" alt="Patrimar móveis" onerror="this.style.display='none'">
   <div>
     <div class="hdr-title">RASTREIO <span>CORTE</span></div>
   </div>
@@ -147,7 +171,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
-      <div class="sec-sub">Informe a <b>data-meta</b> (quando o lote deveria estar cortado). O painel guarda no navegador e marca o status.</div>
+      <div class="sec-sub">Informe a <b>data-meta</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.</div>
+      <div class="prazo-actions">
+        <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
+        <span id="prog-info" class="prog-info"></span>
+        <input type="file" id="file-prog" accept=".xlsx,.xls" class="hidden">
+      </div>
       <div class="tbl-wrap"><table id="tbl-prazo"></table></div>
     </section>
 
@@ -172,7 +201,10 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
 <script>
 "use strict";
-const LS_PRAZO = "rastreioCorte:prazo:";  // + loteKey  -> yyyy-mm-dd
+const LS_PRAZO = "rastreioCorte:prazo:";  // + loteKey  -> yyyy-mm-dd (data-meta manual)
+const LS_PROG  = "rastreioCorte:prog";    // JSON {"129/26":"2026-07-13",...} datas da Programação (coluna B)
+let PROG_MAP = {};
+try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG_MAP={}; }
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
@@ -195,6 +227,24 @@ function daysBetween(a,b){ return Math.round((a-b)/86400000); }
 function todayMidday(){ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate(),12,0,0); }
 // sort lote keys by their numeric part: "LT 129/26"
 function loteNum(k){ const m=String(k).match(/(\d+)\/(\d+)/); return m? (+m[2])*100000 + (+m[1]) : 9e9; }
+// normaliza "LT 129/26" ou "129/26" -> "129/26" (sem zeros à esquerda) p/ casar Corte × Programação
+function loteKeyNorm(s){ const m=String(s||"").match(/(\d+)\s*\/\s*(\d+)/); return m? (String(+m[1])+"/"+m[2]) : null; }
+// célula de data (serial Excel, Date, ou texto dd/mm/aa) -> "yyyy-mm-dd"
+function cellToISO(v){
+  if(v==null||v==="") return "";
+  if(typeof v==="number"){ const o=XLSX.SSF.parse_date_code(v); if(!o||!o.y) return ""; return o.y+"-"+String(o.m).padStart(2,"0")+"-"+String(o.d).padStart(2,"0"); }
+  if(v instanceof Date){ return v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0"); }
+  const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){ let y=+m[3]; if(y<100)y+=2000; return y+"-"+String(+m[2]).padStart(2,"0")+"-"+String(+m[1]).padStart(2,"0"); }
+  return "";
+}
+// meta efetiva de um lote: manual (digitada) tem prioridade sobre a da Programação
+function getMeta(lote){
+  const manual = localStorage.getItem(LS_PRAZO+lote);
+  if(manual) return {iso:manual, src:"manual"};
+  const k=loteKeyNorm(lote); const prog = k? PROG_MAP[k] : null;
+  if(prog) return {iso:prog, src:"prog"};
+  return {iso:"", src:null};
+}
 
 /* ---------- parse workbook ---------- */
 function parseWorkbook(wb){
@@ -231,6 +281,25 @@ function parseWorkbook(wb){
   return {period, recs};
 }
 
+/* ---------- parse Programação (datas-meta na coluna B) ---------- */
+function parseProgramacao(wb){
+  const map={}; let n=0;
+  for(const name of wb.SheetNames){
+    if(name==="Claude Log"||name==="PLANEJAMENTO MESTRE") continue;
+    const ws=wb.Sheets[name]; if(!ws) continue;
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    for(const r of rows){
+      const c=r&&r[2];                                   // coluna C = Nº LOTE
+      if(c==null) continue;
+      if(!/^\s*\d+\s*\/\s*\d+\s*$/.test(String(c))) continue;  // só "NNN/YY"
+      const k=loteKeyNorm(c); if(!k) continue;
+      const iso=cellToISO(r[1]);                          // coluna B = data prevista (CORTE MDP UNI 1)
+      if(iso){ map[k]=iso; n++; }
+    }
+  }
+  return {map,n};
+}
+
 /* ---------- aggregate ---------- */
 function aggregate(recs){
   const mat={}, loteT={}, dataT={}, funcLote={}, loteDates={}, funcT={};
@@ -260,7 +329,8 @@ function aggregate(recs){
 let AGG=null;
 
 function statusFor(lote){
-  const iso = localStorage.getItem(LS_PRAZO+lote) || "";
+  const meta = getMeta(lote);
+  const iso = meta.iso;
   const prazo = isoToDate(iso);
   const dias = [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
   const last = dias.length? dias[dias.length-1] : null;
@@ -271,7 +341,7 @@ function statusFor(lote){
     else if(prazo>=todayMidday()){ cls="b-warn"; txt="Em andamento"; delta=daysBetween(prazo,todayMidday())+"d p/ meta"; }
     else { cls="b-ok"; txt="No prazo"; if(last) delta="−"+Math.abs(daysBetween(prazo,last))+"d"; }
   }
-  return {iso,prazo,first,last,cls,txt,delta};
+  return {iso,prazo,first,last,cls,txt,delta,src:meta.src};
 }
 
 function renderPrazo(){
@@ -285,7 +355,7 @@ function renderPrazo(){
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
-      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'></td>
+      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
       <td class='num'>${s.delta||"—"}</td>
       <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
     </tr>`;
@@ -351,7 +421,12 @@ function renderKpis(){
 function renderAll(period){
   document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
   renderKpis(); renderPrazo(); renderMatriz(); renderFunc();
+  if(Object.keys(PROG_MAP).length){
+    let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
+    setProgInfo(`✓ Programação carregada (${Object.keys(PROG_MAP).length} datas) · ${c} lote(s) com prazo automático.`, false);
+  } else { setProgInfo("", false); }
 }
+function setProgInfo(msg, warn){ const e=document.getElementById("prog-info"); if(!e) return; e.textContent=msg; e.style.color=warn?"var(--warn)":"var(--ok)"; }
 
 /* ---------- file handling ---------- */
 function showErr(msg){ const e=document.getElementById("err"); e.textContent="⚠ "+msg; e.classList.remove("hidden"); }
@@ -364,7 +439,13 @@ function handleFile(file){
     try{
       const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
       const {period,recs}=parseWorkbook(wb);
-      if(!recs.length){ showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário”."); return; }
+      if(!recs.length){
+        // talvez seja a planilha da Programação (auto-detecção)
+        const prog=parseProgramacao(wb);
+        if(prog.n){ applyProg(prog,file); return; }
+        showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for a Programação, use o botão “Puxar datas da Programação” na seção Prazo por lote).");
+        return;
+      }
       AGG=aggregate(recs);
       document.getElementById("fname").textContent=file.name;
       document.getElementById("drop").classList.add("hidden");
@@ -374,6 +455,31 @@ function handleFile(file){
     }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); }
   };
   rdr.onerror=()=>showErr("Não consegui abrir o arquivo.");
+  rdr.readAsArrayBuffer(file);
+}
+
+// aplica as datas da Programação (persiste e re-renderiza)
+function applyProg(prog, file){
+  PROG_MAP=prog.map; localStorage.setItem(LS_PROG, JSON.stringify(prog.map));
+  if(AGG){
+    renderPrazo(); renderKpis();
+    let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
+    setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.n} datas · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
+  } else {
+    showErr(`Guardei ${prog.n} datas da Programação. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — os prazos preenchem sozinhos.`);
+  }
+}
+
+function handleProg(file){
+  const rdr=new FileReader();
+  rdr.onload=ev=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+      const prog=parseProgramacao(wb);
+      if(!prog.n){ setProgInfo("⚠ Não achei lotes/datas nessa planilha (esperado coluna C = Nº LOTE e coluna B = data).", true); return; }
+      applyProg(prog,file);
+    }catch(err){ setProgInfo("⚠ Erro ao ler a Programação: "+err.message, true); }
+  };
   rdr.readAsArrayBuffer(file);
 }
 
@@ -407,6 +513,11 @@ document.getElementById("trocar").addEventListener("click",()=>{
   fileInput.value=""; AGG=null;
 });
 document.getElementById("export").addEventListener("click",exportCsv);
+
+/* botão / arquivo da Programação */
+const fileProg=document.getElementById("file-prog");
+document.getElementById("btn-prog").addEventListener("click",()=>fileProg.click());
+fileProg.addEventListener("change",e=>{ if(e.target.files[0]) handleProg(e.target.files[0]); fileProg.value=""; });
 
 /* clock */
 function tick(){ const d=new Date(); document.getElementById("clock").textContent=
