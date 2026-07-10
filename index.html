@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rastreio do Corte · Patrimar</title>
+<meta name="theme-color" content="#0A0A0B">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#111111; --surface:#1C1C1C; --elevated:#222222; --border:#2A2A2A;
+  --acc:#FF5C1F; --ok:#4CAF50; --warn:#FF9800; --red:#F44336;
+  --txt:#F5F5F5; --txt2:#888888; --txt3:#3A3A3A;
+  --font-h:'Barlow Condensed',sans-serif; --font-b:'Barlow',sans-serif; --font-d:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:var(--font-b);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--acc)}
+.mono{font-family:var(--font-d)}
+
+/* Header */
+header{display:flex;align-items:center;gap:14px;height:54px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.hdr-logo{height:30px;width:auto}
+.hdr-empresa{font-family:var(--font-h);font-weight:700;font-size:15px;letter-spacing:1.5px}
+.hdr-setor{font-family:var(--font-d);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--txt2);border-left:1px solid var(--border);padding-left:12px;margin-left:2px}
+.hdr-title{font-family:var(--font-h);font-weight:700;font-size:16px;letter-spacing:1px}
+.hdr-title span{color:var(--acc)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.hdr-clock{font-family:var(--font-d);font-size:13px;color:var(--acc);letter-spacing:1px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+main{flex:1;padding:20px;max-width:1200px;width:100%;margin:0 auto}
+
+/* Drop zone */
+#drop{border:1.5px dashed var(--border);border-radius:12px;background:var(--surface);
+  padding:60px 24px;text-align:center;cursor:pointer;transition:.2s;margin-top:24px}
+#drop.hover{border-color:var(--acc);background:#201914}
+#drop .big{font-family:var(--font-h);font-weight:700;font-size:26px;letter-spacing:.5px;margin-bottom:8px}
+#drop .sub{color:var(--txt2);font-size:14px;max-width:520px;margin:0 auto;line-height:1.5}
+#drop .icon{font-size:44px;margin-bottom:14px;opacity:.7}
+#drop .btn{display:inline-block;margin-top:18px;background:var(--acc);color:#111;font-family:var(--font-d);
+  font-weight:600;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:10px 22px;border-radius:6px}
+.hint{color:var(--txt3);font-size:12px;margin-top:14px;font-family:var(--font-d)}
+
+/* File bar */
+#filebar{display:none;align-items:center;gap:14px;background:var(--surface);border:.5px solid var(--border);
+  border-radius:8px;padding:12px 16px;margin-bottom:18px;flex-wrap:wrap}
+#filebar .fname{font-family:var(--font-d);font-size:12px;color:var(--txt)}
+#filebar .fper{font-family:var(--font-d);font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px}
+#filebar .sep{color:var(--txt3)}
+.linkbtn{background:none;border:.5px solid var(--border);color:var(--txt2);font-family:var(--font-d);font-size:11px;
+  text-transform:uppercase;letter-spacing:1px;padding:7px 14px;border-radius:6px;cursor:pointer;margin-left:auto}
+.linkbtn:hover{border-color:var(--acc);color:var(--acc)}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.kpi{position:relative;background:var(--surface);border:.5px solid var(--border);border-radius:7px;padding:14px 16px;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.kpi.ok::before{background:var(--ok)} .kpi.red::before{background:var(--red)} .kpi.warn::before{background:var(--warn)}
+.kpi .lbl{font-family:var(--font-d);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--txt2)}
+.kpi .val{font-family:var(--font-h);font-weight:700;font-size:30px;line-height:1.1;margin-top:4px}
+.kpi .val small{font-size:14px;color:var(--txt2);font-weight:600}
+
+/* Sections */
+section{margin-bottom:26px}
+h2{font-family:var(--font-h);font-weight:700;font-size:18px;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+h2 .tag{font-family:var(--font-d);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--txt2);font-weight:400}
+.sec-sub{color:var(--txt2);font-size:12px;margin-bottom:12px}
+
+/* Tables */
+.tbl-wrap{background:var(--surface);border:.5px solid var(--border);border-radius:7px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--elevated);font-family:var(--font-d);font-size:9px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--txt2);font-weight:600;text-align:right;padding:10px 14px;white-space:nowrap;position:sticky;top:0}
+th.l,td.l{text-align:left}
+td{padding:9px 14px;border-bottom:.5px solid var(--border);text-align:right;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#191919}
+td.num{font-family:var(--font-d)}
+td.zero{color:var(--txt3)}
+.trtot td{background:var(--elevated);font-weight:700;font-family:var(--font-d);border-top:1px solid var(--border)}
+.lote-name{font-family:var(--font-d);font-weight:600;color:var(--txt)}
+.lote-desc{color:var(--txt2);font-size:11px}
+
+/* Status badges */
+.badge{display:inline-block;font-family:var(--font-d);font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.b-ok{background:rgba(76,175,80,.12);color:var(--ok);border:.5px solid rgba(76,175,80,.4)}
+.b-red{background:rgba(244,67,54,.12);color:var(--red);border:.5px solid rgba(244,67,54,.4)}
+.b-warn{background:rgba(255,152,0,.12);color:var(--warn);border:.5px solid rgba(255,152,0,.4)}
+.b-mute{background:var(--elevated);color:var(--txt2);border:.5px solid var(--border)}
+input[type=date]{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:5px 8px;border-radius:5px;color-scheme:dark}
+input[type=date]:focus{outline:none;border-color:var(--acc)}
+
+footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--font-d);font-size:10px;
+  text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border)}
+.err{background:rgba(244,67,54,.1);border:.5px solid rgba(244,67,54,.4);color:#ffb4ad;padding:14px 16px;
+  border-radius:8px;font-size:13px;margin-top:18px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <img class="hdr-logo" src="/patrimar-logo.png" alt="Patrimar móveis" onerror="this.style.display='none'">
+  <div>
+    <div class="hdr-title">RASTREIO <span>CORTE</span></div>
+  </div>
+  <div class="hdr-setor">Por lote &amp; data · Jaci/SP</div>
+  <div class="hdr-right">
+    <span class="dot"></span>
+    <span class="hdr-clock" id="clock">--:--</span>
+  </div>
+</header>
+
+<main>
+  <!-- Empty state -->
+  <div id="drop">
+    <div class="icon">📄</div>
+    <div class="big">Arraste aqui o relatório do sistema</div>
+    <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> (.xlsx) que você exporta do sistema.
+      O painel monta a comparação por lote e data automaticamente — nada é enviado pra internet, tudo roda no seu navegador.</div>
+    <div class="btn">Selecionar arquivo</div>
+    <div class="hint">.xlsx exportado do sistema · fica tudo local</div>
+    <input type="file" id="file" accept=".xlsx,.xls" class="hidden">
+  </div>
+  <div id="err" class="err hidden"></div>
+
+  <!-- Loaded state -->
+  <div id="painel" class="hidden">
+    <div id="filebar">
+      <span class="fname" id="fname"></span>
+      <span class="sep">·</span>
+      <span class="fper" id="fper"></span>
+      <button class="linkbtn" id="trocar">Trocar arquivo</button>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <section id="sec-prazo">
+      <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
+      <div class="sec-sub">Informe a <b>data-meta</b> (quando o lote deveria estar cortado). O painel guarda no navegador e marca o status.</div>
+      <div class="tbl-wrap"><table id="tbl-prazo"></table></div>
+    </section>
+
+    <section id="sec-matriz">
+      <h2>Cortado por lote &amp; data <span class="tag">matriz data × lote</span></h2>
+      <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.</div>
+      <div class="tbl-wrap"><table id="tbl-matriz"></table></div>
+    </section>
+
+    <section id="sec-func">
+      <h2>Por funcionário <span class="tag">quem cortou o quê</span></h2>
+      <div class="tbl-wrap"><table id="tbl-func"></table></div>
+    </section>
+
+    <div style="text-align:right">
+      <button class="linkbtn" id="export" style="margin:0">⬇ Exportar consolidação (.csv)</button>
+    </div>
+  </div>
+</main>
+
+<footer>Rastreio do Corte · Patrimar Móveis · processado localmente no navegador</footer>
+
+<script>
+"use strict";
+const LS_PRAZO = "rastreioCorte:prazo:";  // + loteKey  -> yyyy-mm-dd
+
+/* ---------- utils ---------- */
+const fmt = n => (n||0).toLocaleString("pt-BR");
+function parseBR(x){
+  if(x===null||x===undefined||x==="") return 0;
+  if(typeof x==="number") return x;
+  let s=String(x).trim().replace(/\./g,"").replace(",",".");
+  const v=parseFloat(s); return isNaN(v)?0:v;
+}
+// "10/07/26" -> Date (local, midday to avoid TZ edge)
+function brToDate(s){
+  const m=String(s||"").match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
+  if(!m) return null;
+  let y=+m[3]; if(y<100) y+=2000;
+  return new Date(y,(+m[2])-1,+m[1],12,0,0);
+}
+function isoToDate(s){ if(!s) return null; const [y,mo,d]=s.split("-").map(Number); return new Date(y,mo-1,d,12,0,0); }
+function dateToBR(d){ if(!d) return "—"; return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(-2); }
+function daysBetween(a,b){ return Math.round((a-b)/86400000); }
+function todayMidday(){ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate(),12,0,0); }
+// sort lote keys by their numeric part: "LT 129/26"
+function loteNum(k){ const m=String(k).match(/(\d+)\/(\d+)/); return m? (+m[2])*100000 + (+m[1]) : 9e9; }
+
+/* ---------- parse workbook ---------- */
+function parseWorkbook(wb){
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  let period="", curFunc=null, lastOp=null;
+  const recs=[];
+  for(const row of rows){
+    const c = row||[];
+    // period line
+    for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
+    // funcionário header
+    if(c[1]==="FUNCIONÁRIO"){ curFunc = String(c[3]||c[2]||"").trim(); continue; }
+    // column header
+    if(c[0]==="ORDEM") continue;
+    // lote row (closes the previous operation)
+    if(c[0]==="Lote"){
+      if(lastOp){
+        const desc = String(c[2]||"").trim();
+        const m = desc.match(/LT\s?\d+\/\d+/);
+        lastOp.lote = m ? m[0].replace(/\s+/g," ").toUpperCase() : (desc||"—");
+        lastOp.loteDesc = desc;
+        recs.push(lastOp); lastOp=null;
+      }
+      continue;
+    }
+    // operation row: col 0 numeric = ORDEM
+    if(typeof c[0]==="number"){
+      lastOp = { ordem:c[0], qtde:parseBR(c[2]), data:String(c[3]||"").trim(),
+                 func: curFunc || String(c[7]||"").trim() || "—" };
+      continue;
+    }
+  }
+  return {period, recs};
+}
+
+/* ---------- aggregate ---------- */
+function aggregate(recs){
+  const mat={}, loteT={}, dataT={}, funcLote={}, loteDates={}, funcT={};
+  const lotesSet=new Set(), datasSet=new Set(), funcsSet=new Set();
+  let grand=0;
+  for(const r of recs){
+    const key=r.data+"|"+r.lote;
+    mat[key]=(mat[key]||0)+r.qtde;
+    loteT[r.lote]=(loteT[r.lote]||0)+r.qtde;
+    dataT[r.data]=(dataT[r.data]||0)+r.qtde;
+    funcT[r.func]=(funcT[r.func]||0)+r.qtde;
+    const fk=r.func+"|"+r.lote; funcLote[fk]=(funcLote[fk]||0)+r.qtde;
+    (loteDates[r.lote]=loteDates[r.lote]||new Set()).add(r.data);
+    lotesSet.add(r.lote); datasSet.add(r.data); funcsSet.add(r.func);
+    grand+=r.qtde;
+  }
+  const lotes=[...lotesSet].sort((a,b)=>loteNum(a)-loteNum(b));
+  const datas=[...datasSet].sort((a,b)=>brToDate(a)-brToDate(b));
+  const funcs=[...funcsSet].sort((a,b)=>(funcT[b]-funcT[a]));
+  // descrição representativa por lote
+  const loteDescs={};
+  for(const r of recs){ if(!loteDescs[r.lote] && r.loteDesc) loteDescs[r.lote]=r.loteDesc; }
+  return {mat,loteT,dataT,funcT,funcLote,loteDates,lotes,datas,funcs,grand,loteDescs,count:recs.length};
+}
+
+/* ---------- render ---------- */
+let AGG=null;
+
+function statusFor(lote){
+  const iso = localStorage.getItem(LS_PRAZO+lote) || "";
+  const prazo = isoToDate(iso);
+  const dias = [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
+  const last = dias.length? dias[dias.length-1] : null;
+  const first = dias.length? dias[0] : null;
+  let cls="b-mute", txt="Sem meta", delta="";
+  if(prazo){
+    if(last && last>prazo){ cls="b-red"; txt="Atrasado"; delta="+"+daysBetween(last,prazo)+"d"; }
+    else if(prazo>=todayMidday()){ cls="b-warn"; txt="Em andamento"; delta=daysBetween(prazo,todayMidday())+"d p/ meta"; }
+    else { cls="b-ok"; txt="No prazo"; if(last) delta="−"+Math.abs(daysBetween(prazo,last))+"d"; }
+  }
+  return {iso,prazo,first,last,cls,txt,delta};
+}
+
+function renderPrazo(){
+  const t=document.getElementById("tbl-prazo");
+  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1ª data</th><th>Última data</th><th class='l'>Data-meta (prazo)</th><th>Δ dias</th><th class='l'>Status</th></tr></thead><tbody>";
+  for(const lote of AGG.lotes){
+    const s=statusFor(lote);
+    const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+    h+=`<tr>
+      <td class='l'><span class='lote-name'>${lote}</span>${desc?`<div class='lote-desc'>${desc}</div>`:""}</td>
+      <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
+      <td class='num'>${dateToBR(s.first)}</td>
+      <td class='num'>${dateToBR(s.last)}</td>
+      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'></td>
+      <td class='num'>${s.delta||"—"}</td>
+      <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
+    </tr>`;
+  }
+  h+="</tbody>";
+  t.innerHTML=h;
+  t.querySelectorAll("input[type=date]").forEach(inp=>{
+    inp.addEventListener("change",e=>{
+      const lote=e.target.dataset.lote, v=e.target.value;
+      if(v) localStorage.setItem(LS_PRAZO+lote,v); else localStorage.removeItem(LS_PRAZO+lote);
+      renderPrazo(); renderKpis();
+    });
+  });
+}
+
+function renderMatriz(){
+  const t=document.getElementById("tbl-matriz");
+  let h="<thead><tr><th class='l'>Data</th>";
+  for(const l of AGG.lotes) h+=`<th>${l}</th>`;
+  h+="<th>Total dia</th></tr></thead><tbody>";
+  for(const d of AGG.datas){
+    h+=`<tr><td class='l num'>${d}</td>`;
+    for(const l of AGG.lotes){ const v=AGG.mat[d+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
+    h+=`<td class='num'>${fmt(AGG.dataT[d])}</td></tr>`;
+  }
+  h+="<tr class='trtot'><td class='l'>Total cortado</td>";
+  for(const l of AGG.lotes) h+=`<td>${fmt(AGG.loteT[l])}</td>`;
+  h+=`<td>${fmt(AGG.grand)}</td></tr></tbody>`;
+  t.innerHTML=h;
+}
+
+function renderFunc(){
+  const t=document.getElementById("tbl-func");
+  let h="<thead><tr><th class='l'>Funcionário</th>";
+  for(const l of AGG.lotes) h+=`<th>${l}</th>`;
+  h+="<th>Total</th></tr></thead><tbody>";
+  for(const f of AGG.funcs){
+    h+=`<tr><td class='l'>${f}</td>`;
+    for(const l of AGG.lotes){ const v=AGG.funcLote[f+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
+    h+=`<td class='num'>${fmt(AGG.funcT[f])}</td></tr>`;
+  }
+  h+="<tr class='trtot'><td class='l'>Total</td>";
+  for(const l of AGG.lotes) h+=`<td>${fmt(AGG.loteT[l])}</td>`;
+  h+=`<td>${fmt(AGG.grand)}</td></tr></tbody>`;
+  t.innerHTML=h;
+}
+
+function renderKpis(){
+  const k=document.getElementById("kpis");
+  let atrasados=0, semMeta=0;
+  for(const l of AGG.lotes){ const s=statusFor(l); if(s.cls==="b-red") atrasados++; if(s.cls==="b-mute") semMeta++; }
+  const cards=[
+    {lbl:"Total cortado", val:fmt(AGG.grand), sub:"peças", cls:""},
+    {lbl:"Lotes", val:AGG.lotes.length, cls:""},
+    {lbl:"Funcionários", val:AGG.funcs.length, cls:""},
+    {lbl:"Dias no arquivo", val:AGG.datas.length, cls:""},
+    {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
+    {lbl:"Sem data-meta", val:semMeta, cls:semMeta?"warn":"ok"},
+  ];
+  k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
+}
+
+function renderAll(period){
+  document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
+  renderKpis(); renderPrazo(); renderMatriz(); renderFunc();
+}
+
+/* ---------- file handling ---------- */
+function showErr(msg){ const e=document.getElementById("err"); e.textContent="⚠ "+msg; e.classList.remove("hidden"); }
+function clearErr(){ document.getElementById("err").classList.add("hidden"); }
+
+function handleFile(file){
+  clearErr();
+  const rdr=new FileReader();
+  rdr.onload=ev=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+      const {period,recs}=parseWorkbook(wb);
+      if(!recs.length){ showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário”."); return; }
+      AGG=aggregate(recs);
+      document.getElementById("fname").textContent=file.name;
+      document.getElementById("drop").classList.add("hidden");
+      document.getElementById("painel").classList.remove("hidden");
+      document.getElementById("filebar").style.display="flex";
+      renderAll(period);
+    }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); }
+  };
+  rdr.onerror=()=>showErr("Não consegui abrir o arquivo.");
+  rdr.readAsArrayBuffer(file);
+}
+
+/* export csv */
+function exportCsv(){
+  if(!AGG) return;
+  const rows=[];
+  rows.push(["Data", ...AGG.lotes, "Total dia"]);
+  for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), AGG.dataT[d]]); }
+  rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.grand]);
+  rows.push([]);
+  rows.push(["Lote","Cortado","Data-meta","Status"]);
+  for(const l of AGG.lotes){ const s=statusFor(l); rows.push([l, AGG.loteT[l], s.iso?dateToBR(s.prazo):"", s.txt]); }
+  const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="consolidacao_corte.csv"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- wire up ---------- */
+const drop=document.getElementById("drop"), fileInput=document.getElementById("file");
+drop.addEventListener("click",()=>fileInput.click());
+fileInput.addEventListener("change",e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hover");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hover");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+document.getElementById("trocar").addEventListener("click",()=>{
+  document.getElementById("painel").classList.add("hidden");
+  document.getElementById("filebar").style.display="none";
+  document.getElementById("drop").classList.remove("hidden");
+  fileInput.value=""; AGG=null;
+});
+document.getElementById("export").addEventListener("click",exportCsv);
+
+/* clock */
+function tick(){ const d=new Date(); document.getElementById("clock").textContent=
+  String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+tick(); setInterval(tick,10000);
+</script>
+</body>
+</html>
