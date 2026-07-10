@@ -146,8 +146,11 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #print-head .ph-title{font-family:var(--font-h);font-weight:700;font-size:19px;letter-spacing:.5px;color:#111}
   #print-head .ph-title span{color:#FF5C1F}
   #print-head .ph-meta{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}
-  h2{color:#111 !important;font-size:14px;margin:12px 0 4px} h2 .tag{display:none}
+  h2{color:#111 !important;font-size:14px;margin:0 0 6px} h2 .tag{display:none}
   section{margin-bottom:10px} .sec-sub{display:none}
+  /* cada tabela larga começa em página nova, sem cortar ao meio */
+  #sec-matriz{break-before:page;page-break-before:always}
+  #sec-func{break-before:page;page-break-before:always}
   .kpis{display:flex;gap:6px;margin-bottom:12px}
   .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
