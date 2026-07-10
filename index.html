@@ -130,6 +130,38 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 .err{background:rgba(244,67,54,.1);border:.5px solid rgba(244,67,54,.4);color:#ffb4ad;padding:14px 16px;
   border-radius:8px;font-size:13px;margin-top:18px}
 .hidden{display:none!important}
+.foot-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.print-only{display:none}
+.print-date{display:none}
+
+/* ================= IMPRESSÃO / PDF ================= */
+@media print{
+  @page{ size:A4 landscape; margin:11mm; }
+  html,body{background:#fff !important;color:#111 !important}
+  header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar{display:none !important}
+  main{max-width:100% !important;padding:0 !important}
+  .print-only{display:block}
+  #print-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:12px}
+  #print-head .ph-logo{height:32px}
+  #print-head .ph-title{font-family:var(--font-h);font-weight:700;font-size:19px;letter-spacing:.5px;color:#111}
+  #print-head .ph-title span{color:#FF5C1F}
+  #print-head .ph-meta{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}
+  h2{color:#111 !important;font-size:14px;margin:12px 0 4px} h2 .tag{display:none}
+  section{margin-bottom:10px} .sec-sub{display:none}
+  .kpis{display:flex;gap:6px;margin-bottom:12px}
+  .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
+  .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
+  .tbl-wrap{overflow:visible !important;border:1px solid #bbb}
+  table{font-size:9px;width:100%}
+  th{background:#eee !important;color:#333 !important;position:static !important;box-shadow:none !important;padding:5px 6px;border-bottom:1px solid #bbb}
+  td{color:#111 !important;background:#fff !important;position:static !important;box-shadow:none !important;padding:4px 6px;border-bottom:1px solid #e2e2e2 !important}
+  .trtot td{background:#eee !important;color:#111 !important}
+  tr{break-inside:avoid} tbody tr:hover{background:#fff !important}
+  input[type=date]{display:none} .print-date{display:inline;color:#111;font-family:var(--font-d)} .src-prog{display:none}
+  .lote-name{color:#111 !important} .lote-desc{color:#666} td.zero{color:#bbb}
+  .badge{border:1px solid currentColor;background:#fff !important;padding:2px 6px}
+  .b-ok{color:#2e7d32 !important} .b-red{color:#c62828 !important} .b-warn{color:#e65100 !important} .b-mute{color:#999 !important}
+}
 </style>
 </head>
 <body>
@@ -167,6 +199,14 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <button class="linkbtn" id="trocar">Trocar arquivo</button>
     </div>
 
+    <div id="print-head" class="print-only">
+      <img src="patrimar-logo.png" class="ph-logo" alt="Patrimar" onerror="this.style.display='none'">
+      <div class="ph-txt">
+        <div class="ph-title">Rastreio do Corte <span>· Relatório</span></div>
+        <div class="ph-meta" id="ph-meta"></div>
+      </div>
+    </div>
+
     <div class="kpis" id="kpis"></div>
 
     <section id="sec-prazo">
@@ -174,6 +214,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
+        <button class="linkbtn" id="btn-limpar" style="margin:0">Limpar datas manuais</button>
         <span id="prog-info" class="prog-info"></span>
         <input type="file" id="file-prog" accept=".xlsx,.xls" class="hidden">
       </div>
@@ -191,7 +232,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="tbl-wrap"><table id="tbl-func"></table></div>
     </section>
 
-    <div style="text-align:right">
+    <div class="foot-actions">
+      <button class="linkbtn" id="btn-pdf" style="margin:0">🖨️ Gerar relatório em PDF</button>
       <button class="linkbtn" id="export" style="margin:0">⬇ Exportar consolidação (.csv)</button>
     </div>
   </div>
@@ -355,7 +397,7 @@ function renderPrazo(){
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
-      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
+      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'><span class='print-date'>${s.iso?dateToBR(s.prazo):"—"}</span>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
       <td class='l' style='color:var(--txt2)'>${s.delta||"—"}</td>
       <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
     </tr>`;
@@ -458,9 +500,17 @@ function handleFile(file){
   rdr.readAsArrayBuffer(file);
 }
 
-// aplica as datas da Programação (persiste e re-renderiza)
+// aplica as datas da Programação (persiste e re-renderiza).
+// A Programação MANDA: remove as datas manuais dos lotes que ela cobre.
 function applyProg(prog, file){
   PROG_MAP=prog.map; localStorage.setItem(LS_PROG, JSON.stringify(prog.map));
+  for(let i=localStorage.length-1;i>=0;i--){
+    const key=localStorage.key(i);
+    if(key && key.indexOf(LS_PRAZO)===0){
+      const k=loteKeyNorm(key.slice(LS_PRAZO.length));
+      if(k && prog.map[k]) localStorage.removeItem(key);   // deixa a data da Programação valer
+    }
+  }
   if(AGG){
     renderPrazo(); renderKpis();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
@@ -468,6 +518,14 @@ function applyProg(prog, file){
   } else {
     showErr(`Guardei ${prog.n} datas da Programação. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — os prazos preenchem sozinhos.`);
   }
+}
+// zera todas as datas digitadas na mão (volta pras da Programação, se houver)
+function limparManuais(){
+  for(let i=localStorage.length-1;i>=0;i--){
+    const key=localStorage.key(i);
+    if(key && key.indexOf(LS_PRAZO)===0) localStorage.removeItem(key);
+  }
+  if(AGG){ renderPrazo(); renderKpis(); setProgInfo("Datas manuais limpas.", false); }
 }
 
 function handleProg(file){
@@ -518,6 +576,16 @@ document.getElementById("export").addEventListener("click",exportCsv);
 const fileProg=document.getElementById("file-prog");
 document.getElementById("btn-prog").addEventListener("click",()=>fileProg.click());
 fileProg.addEventListener("change",e=>{ if(e.target.files[0]) handleProg(e.target.files[0]); fileProg.value=""; });
+document.getElementById("btn-limpar").addEventListener("click",limparManuais);
+
+/* gerar PDF (impressão do navegador -> Salvar como PDF) */
+document.getElementById("btn-pdf").addEventListener("click",()=>{
+  const per=document.getElementById("fper").textContent||"";
+  const n=new Date();
+  const dt=String(n.getDate()).padStart(2,"0")+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getFullYear()).slice(-2)+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  document.getElementById("ph-meta").textContent=(per?per+" · ":"")+"Gerado em "+dt;
+  window.print();
+});
 
 /* clock */
 function tick(){ const d=new Date(); document.getElementById("clock").textContent=
