@@ -120,6 +120,9 @@ td.zero{color:var(--txt3)}
 input[type=date]{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:5px 8px;border-radius:5px;color-scheme:dark}
 input[type=date]:focus{outline:none;border-color:var(--acc)}
+#op-filter{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer}
+#op-filter:focus{outline:none;border-color:var(--acc)}
 .prazo-actions{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
 .prog-info{font-family:var(--font-d);font-size:11px;color:var(--txt2)}
 .src-prog{display:inline-block;font-family:var(--font-d);font-size:8px;letter-spacing:.5px;color:var(--acc);
@@ -227,6 +230,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-matriz">
       <h2>Cortado por lote &amp; data <span class="tag">matriz data × lote</span></h2>
       <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.</div>
+      <div class="prazo-actions">
+        <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Operador:
+          <select id="op-filter"><option value="">Todos</option></select>
+        </label>
+        <span id="op-info" class="prog-info"></span>
+      </div>
       <div class="tbl-wrap"><table id="tbl-matriz"></table></div>
     </section>
 
@@ -237,6 +246,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <div class="foot-actions">
       <button class="linkbtn" id="btn-pdf" style="margin:0">🖨️ Gerar relatório em PDF</button>
+      <button class="linkbtn" id="btn-xlsx" style="margin:0">⬇ Exportar por operador (.xlsx)</button>
       <button class="linkbtn" id="export" style="margin:0">⬇ Exportar consolidação (.csv)</button>
     </div>
   </div>
@@ -295,14 +305,14 @@ function getMeta(lote){
 function parseWorkbook(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  let period="", curFunc=null, lastOp=null;
+  let period="", curFunc=null, curFuncCod="", lastOp=null;
   const recs=[];
   for(const row of rows){
     const c = row||[];
     // period line
     for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
     // funcionário header
-    if(c[1]==="FUNCIONÁRIO"){ curFunc = String(c[3]||c[2]||"").trim(); continue; }
+    if(c[1]==="FUNCIONÁRIO"){ curFuncCod = String(c[2]||"").trim(); curFunc = String(c[3]||c[2]||"").trim(); continue; }
     // column header
     if(c[0]==="ORDEM") continue;
     // lote row (closes the previous operation)
@@ -320,7 +330,8 @@ function parseWorkbook(wb){
     if(typeof c[0]==="number"){
       // QTDE PROD. é peça: conta só a parte inteira (trunca frações como 33,3400 / 0,3334)
       lastOp = { ordem:c[0], qtde:Math.trunc(parseBR(c[2])), data:String(c[3]||"").trim(),
-                 func: curFunc || String(c[7]||"").trim() || "—" };
+                 func: curFunc || String(c[7]||"").trim() || "—",
+                 funcCod: curFuncCod || String(c[6]||"").trim() || "" };
       continue;
     }
   }
@@ -368,11 +379,33 @@ function aggregate(recs){
   // descrição representativa por lote
   const loteDescs={};
   for(const r of recs){ if(!loteDescs[r.lote] && r.loteDesc) loteDescs[r.lote]=r.loteDesc; }
-  return {mat,loteT,dataT,funcT,funcLote,loteDates,lotes,datas,funcs,grand,loteDescs,count:recs.length};
+  // operadores (código -> nome), ordenados por código numérico
+  const opMap={};
+  for(const r of recs){ const cod=r.funcCod||""; if(cod && !opMap[cod]) opMap[cod]=r.func; }
+  const ops=Object.keys(opMap).sort((a,b)=>{ const na=+a,nb=+b; return (isNaN(na)||isNaN(nb))? a.localeCompare(b):na-nb; })
+                  .map(cod=>({cod,nome:opMap[cod]}));
+  return {mat,loteT,dataT,funcT,funcLote,loteDates,lotes,datas,funcs,grand,loteDescs,ops,recs,count:recs.length};
+}
+
+// Monta a matriz Data×Lote (mat/totais/eixos) a partir de um subconjunto de registros.
+// Usado tanto p/ o consolidado (todos) quanto p/ o filtro/abas por operador.
+function buildMatrix(list){
+  const mat={}, loteT={}, dataT={}; let grand=0;
+  const lotesSet=new Set(), datasSet=new Set();
+  for(const r of list){
+    mat[r.data+"|"+r.lote]=(mat[r.data+"|"+r.lote]||0)+r.qtde;
+    loteT[r.lote]=(loteT[r.lote]||0)+r.qtde;
+    dataT[r.data]=(dataT[r.data]||0)+r.qtde;
+    lotesSet.add(r.lote); datasSet.add(r.data); grand+=r.qtde;
+  }
+  const lotes=[...lotesSet].sort((a,b)=>loteNum(a)-loteNum(b));
+  const datas=[...datasSet].sort((a,b)=>brToDate(a)-brToDate(b));
+  return {mat,loteT,dataT,lotes,datas,grand};
 }
 
 /* ---------- render ---------- */
 let AGG=null;
+let OP_FILTER="";   // "" = todos; senão = código do operador selecionado na matriz
 
 function statusFor(lote){
   const meta = getMeta(lote);
@@ -419,18 +452,29 @@ function renderPrazo(){
 
 function renderMatriz(){
   const t=document.getElementById("tbl-matriz");
+  const M = OP_FILTER ? buildMatrix(AGG.recs.filter(r=>r.funcCod===OP_FILTER)) : AGG;
   let h="<thead><tr><th class='l'>Data</th>";
-  for(const l of AGG.lotes) h+=`<th>${l}</th>`;
+  for(const l of M.lotes) h+=`<th>${l}</th>`;
   h+="<th>Total dia</th></tr></thead><tbody>";
-  for(const d of AGG.datas){
+  for(const d of M.datas){
     h+=`<tr><td class='l num'>${d}</td>`;
-    for(const l of AGG.lotes){ const v=AGG.mat[d+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
-    h+=`<td class='num'>${fmt(AGG.dataT[d])}</td></tr>`;
+    for(const l of M.lotes){ const v=M.mat[d+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
+    h+=`<td class='num'>${fmt(M.dataT[d])}</td></tr>`;
   }
   h+="<tr class='trtot'><td class='l'>Total cortado</td>";
-  for(const l of AGG.lotes) h+=`<td>${fmt(AGG.loteT[l])}</td>`;
-  h+=`<td>${fmt(AGG.grand)}</td></tr></tbody>`;
+  for(const l of M.lotes) h+=`<td>${fmt(M.loteT[l])}</td>`;
+  h+=`<td>${fmt(M.grand)}</td></tr></tbody>`;
   t.innerHTML=h;
+}
+
+// preenche o seletor de operador (código) da matriz
+function renderOpFilter(){
+  const sel=document.getElementById("op-filter"); if(!sel) return;
+  let h="<option value=''>Todos</option>";
+  for(const o of (AGG.ops||[])) h+=`<option value='${o.cod}'>${o.cod}</option>`;
+  sel.innerHTML=h; sel.value=OP_FILTER;
+  const info=document.getElementById("op-info");
+  if(info){ const o=(AGG.ops||[]).find(x=>x.cod===OP_FILTER); info.textContent=OP_FILTER?("só "+(o?o.cod+" · "+o.nome:OP_FILTER)):""; }
 }
 
 function renderFunc(){
@@ -466,7 +510,8 @@ function renderKpis(){
 
 function renderAll(period){
   document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
-  renderKpis(); renderPrazo(); renderMatriz(); renderFunc();
+  OP_FILTER="";                       // novo arquivo volta pra "Todos"
+  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc();
   if(Object.keys(PROG_MAP).length){
     let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
     setProgInfo(`✓ Programação carregada (${Object.keys(PROG_MAP).length} datas) · ${c} lote(s) com prazo automático.`, false);
@@ -561,6 +606,31 @@ function exportCsv(){
   URL.revokeObjectURL(a.href);
 }
 
+/* export .xlsx com uma aba por operador (+ aba Consolidado com todos) */
+function exportPorOperador(){
+  if(!AGG) return;
+  const wb=XLSX.utils.book_new();
+  const usados=new Set();
+  function addAba(nome, M, titulo){
+    const aoa=[];
+    if(titulo){ aoa.push([titulo]); aoa.push([]); }
+    aoa.push(["Data", ...M.lotes, "Total dia"]);
+    for(const d of M.datas) aoa.push([d, ...M.lotes.map(l=>M.mat[d+"|"+l]||0), M.dataT[d]]);
+    aoa.push(["Total cortado", ...M.lotes.map(l=>M.loteT[l]), M.grand]);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    let nm=String(nome).replace(/[\[\]\*\/\\\?:]/g," ").trim().slice(0,31)||"Plan";
+    let base=nm, i=2; while(usados.has(nm)){ nm=(base.slice(0,27)+" "+i).slice(0,31); i++; }
+    usados.add(nm); XLSX.utils.book_append_sheet(wb, ws, nm);
+  }
+  addAba("Consolidado (Todos)", AGG, null);
+  for(const o of (AGG.ops||[])){
+    const M=buildMatrix(AGG.recs.filter(r=>r.funcCod===o.cod));
+    const primeiroNome=String(o.nome||"").split(/\s+/)[0]||"";
+    addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""));
+  }
+  XLSX.writeFile(wb, "rastreio_por_operador.xlsx");
+}
+
 /* ---------- wire up ---------- */
 const drop=document.getElementById("drop"), fileInput=document.getElementById("file");
 drop.addEventListener("click",()=>fileInput.click());
@@ -575,6 +645,12 @@ document.getElementById("trocar").addEventListener("click",()=>{
   fileInput.value=""; AGG=null;
 });
 document.getElementById("export").addEventListener("click",exportCsv);
+document.getElementById("btn-xlsx").addEventListener("click",exportPorOperador);
+document.getElementById("op-filter").addEventListener("change",e=>{
+  OP_FILTER=e.target.value; renderMatriz();
+  const info=document.getElementById("op-info");
+  if(info){ const o=(AGG&&AGG.ops||[]).find(x=>x.cod===OP_FILTER); info.textContent=OP_FILTER?("só "+(o?o.cod+" · "+o.nome:OP_FILTER)):""; }
+});
 
 /* botão / arquivo da Programação */
 const fileProg=document.getElementById("file-prog");
