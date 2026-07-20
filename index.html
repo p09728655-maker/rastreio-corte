@@ -318,7 +318,8 @@ function parseWorkbook(wb){
     }
     // operation row: col 0 numeric = ORDEM
     if(typeof c[0]==="number"){
-      lastOp = { ordem:c[0], qtde:parseBR(c[2]), data:String(c[3]||"").trim(),
+      // QTDE PROD. é peça: conta só a parte inteira (trunca frações como 33,3400 / 0,3334)
+      lastOp = { ordem:c[0], qtde:Math.trunc(parseBR(c[2])), data:String(c[3]||"").trim(),
                  func: curFunc || String(c[7]||"").trim() || "—" };
       continue;
     }
