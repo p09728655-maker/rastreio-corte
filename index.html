@@ -217,7 +217,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
-      <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.</div>
+      <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.
+        <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>. 🟢 "No prazo" significa que não houve corte depois da meta, e não que o lote está concluído.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
         <button class="linkbtn" id="btn-limpar" style="margin:0">Limpar datas manuais</button>
@@ -263,6 +264,8 @@ try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
+// escapa texto vindo do arquivo (nome de funcionário, descrição de lote…) antes de ir pro innerHTML
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function parseBR(x){
   if(x===null||x===undefined||x==="") return 0;
   if(typeof x==="number") return x;
@@ -430,11 +433,11 @@ function renderPrazo(){
     const s=statusFor(lote);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     h+=`<tr>
-      <td class='l'><span class='lote-name'>${lote}</span>${desc?`<div class='lote-desc'>${desc}</div>`:""}</td>
+      <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
-      <td class='l'><input type='date' data-lote='${lote}' value='${s.iso}'><span class='print-date'>${s.iso?dateToBR(s.prazo):"—"}</span>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
+      <td class='l'><input type='date' data-lote='${esc(lote)}' value='${s.iso}'><span class='print-date'>${s.iso?dateToBR(s.prazo):"—"}</span>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
       <td class='l' style='color:var(--txt2)'>${s.delta||"—"}</td>
       <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
     </tr>`;
@@ -454,7 +457,7 @@ function renderMatriz(){
   const t=document.getElementById("tbl-matriz");
   const M = OP_FILTER ? buildMatrix(AGG.recs.filter(r=>r.funcCod===OP_FILTER)) : AGG;
   let h="<thead><tr><th class='l'>Data</th>";
-  for(const l of M.lotes) h+=`<th>${l}</th>`;
+  for(const l of M.lotes) h+=`<th>${esc(l)}</th>`;
   h+="<th>Total dia</th></tr></thead><tbody>";
   for(const d of M.datas){
     h+=`<tr><td class='l num'>${d}</td>`;
@@ -471,7 +474,7 @@ function renderMatriz(){
 function renderOpFilter(){
   const sel=document.getElementById("op-filter"); if(!sel) return;
   let h="<option value=''>Todos</option>";
-  for(const o of (AGG.ops||[])) h+=`<option value='${o.cod}'>${o.cod}</option>`;
+  for(const o of (AGG.ops||[])) h+=`<option value='${esc(o.cod)}'>${esc(o.cod)}</option>`;
   sel.innerHTML=h; sel.value=OP_FILTER;
   const info=document.getElementById("op-info");
   if(info){ const o=(AGG.ops||[]).find(x=>x.cod===OP_FILTER); info.textContent=OP_FILTER?("só "+(o?o.cod+" · "+o.nome:OP_FILTER)):""; }
@@ -480,10 +483,10 @@ function renderOpFilter(){
 function renderFunc(){
   const t=document.getElementById("tbl-func");
   let h="<thead><tr><th class='l'>Funcionário</th>";
-  for(const l of AGG.lotes) h+=`<th>${l}</th>`;
+  for(const l of AGG.lotes) h+=`<th>${esc(l)}</th>`;
   h+="<th>Total</th></tr></thead><tbody>";
   for(const f of AGG.funcs){
-    h+=`<tr><td class='l'>${f}</td>`;
+    h+=`<tr><td class='l'>${esc(f)}</td>`;
     for(const l of AGG.lotes){ const v=AGG.funcLote[f+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
     h+=`<td class='num'>${fmt(AGG.funcT[f])}</td></tr>`;
   }
