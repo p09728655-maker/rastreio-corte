@@ -618,6 +618,8 @@ function exportPorOperador(){
     const aoa=[];
     if(titulo){ aoa.push([titulo]); aoa.push([]); }
     aoa.push(["Data", ...M.lotes, "Total dia"]);
+    // linha com a data prevista de cada lote (Programação/coluna B ou data manual), embaixo da coluna do lote
+    aoa.push(["Data prevista", ...M.lotes.map(l=>{ const g=getMeta(l); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
     for(const d of M.datas) aoa.push([d, ...M.lotes.map(l=>M.mat[d+"|"+l]||0), M.dataT[d]]);
     aoa.push(["Total cortado", ...M.lotes.map(l=>M.loteT[l]), M.grand]);
     const ws=XLSX.utils.aoa_to_sheet(aoa);
