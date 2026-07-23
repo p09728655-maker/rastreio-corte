@@ -114,15 +114,27 @@ td.zero{color:var(--txt3)}
 #peca-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:6px 10px;border-radius:5px;min-width:280px;flex:0 1 340px}
 #peca-search:focus{outline:none;border-color:var(--acc)}
-#tbl-peca .peca-lote{cursor:pointer}
-#tbl-peca .peca-lote td{background:var(--elevated);font-weight:600;border-top:1px solid var(--border)}
-#tbl-peca .peca-lote:hover td{background:#2a2a2a}
-#tbl-peca .peca-lote td:first-child .lote-name::before{content:"▾ ";color:var(--acc)}
-#tbl-peca .peca-lote.collapsed td:first-child .lote-name::before{content:"▸ ";color:var(--txt2)}
-#tbl-peca .peca-count{font-family:var(--font-d);font-size:9px;color:var(--txt2);letter-spacing:1px;text-transform:uppercase;margin-left:8px}
 #tbl-peca .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
-#tbl-peca .peca-prog{font-family:var(--font-d);font-size:11px;color:var(--txt2);margin-right:8px}
-#tbl-peca .peca-prog b{color:var(--txt)}
+/* cabeçalho do lote: faixa colorida por status, pra bater o olho e ver o desvio */
+#tbl-peca .peca-lote{cursor:pointer}
+#tbl-peca .peca-lote td{border-top:2px solid var(--bg);border-bottom:none;padding:11px 14px}
+#tbl-peca .peca-lote.st-red td{background:rgba(244,67,54,.14);border-left:4px solid var(--red)}
+#tbl-peca .peca-lote.st-warn td{background:rgba(255,152,0,.14);border-left:4px solid var(--warn)}
+#tbl-peca .peca-lote.st-ok td{background:rgba(76,175,80,.13);border-left:4px solid var(--ok)}
+#tbl-peca .peca-lote.st-mute td{background:var(--elevated);border-left:4px solid var(--txt3)}
+#tbl-peca .peca-lote:hover td{filter:brightness(1.18)}
+#tbl-peca .pl-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+#tbl-peca .pl-left{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:200px}
+#tbl-peca .pl-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-left:auto}
+#tbl-peca .pl-lote{font-family:var(--font-d);font-weight:700;color:var(--acc);font-size:14px}
+#tbl-peca .pl-lote::before{content:"▾ ";color:var(--txt2);font-size:11px}
+#tbl-peca .peca-lote.collapsed .pl-lote::before{content:"▸ "}
+#tbl-peca .pl-desc{color:var(--txt);font-size:12.5px}
+#tbl-peca .pl-meta{font-family:var(--font-d);font-size:9px;letter-spacing:1px;color:var(--txt2);text-transform:uppercase}
+#tbl-peca .pl-dates{font-family:var(--font-d);font-size:12px;color:var(--txt2);white-space:nowrap}
+#tbl-peca .pl-dates b{color:var(--txt);font-size:13px}
+#tbl-peca .pl-dates .pl-sep{color:var(--txt3);margin:0 6px}
+#tbl-peca .peca-lote .badge{font-size:11px;padding:4px 11px}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
@@ -617,11 +629,22 @@ function renderPeca(){
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—"; const st=statusFor(lote);
-    h+=`<tr class='peca-lote' data-lote='${esc(lote)}'>
-      <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?` <span class='lote-desc'>${esc(desc)}</span>`:""}<span class='peca-count'>${pecas.length} peça(s)</span></td>
-      <td class='num'>${fmt(totC)}</td>
-      <td colspan='2'></td>
-      <td class='l' colspan='3'><span class='peca-prog'>Programada: <b>${progBR}</b></span>${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""} <span class='badge ${st.cls}'>${st.txt}</span></td></tr>`;
+    const ultBR=st.last?dateToBR(st.last):"—";
+    const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
+    const ic={"b-red":"🔴","b-warn":"🟡","b-ok":"🟢","b-mute":"⚪"}[st.cls]||"⚪";
+    const pill=st.delta||st.txt;
+    h+=`<tr class='peca-lote ${stKey}' data-lote='${esc(lote)}'>
+      <td class='l' colspan='7'><div class='pl-row'>
+        <div class='pl-left'>
+          <span class='pl-lote'>${esc(lote)}</span>
+          ${desc?`<span class='pl-desc'>${esc(desc)}</span>`:""}
+          <span class='pl-meta'>${pecas.length} peça(s) · ${fmt(totC)} pç</span>
+        </div>
+        <div class='pl-right'>
+          <span class='pl-dates'>Programada <b>${progBR}</b>${g.src==="prog"?" <span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}<span class='pl-sep'>→</span>Último corte <b>${ultBR}</b></span>
+          <span class='badge ${st.cls}'>${ic} ${esc(pill)}</span>
+        </div>
+      </div></td></tr>`;
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
       const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
