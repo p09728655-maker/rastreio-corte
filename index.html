@@ -121,6 +121,8 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-lote.collapsed td:first-child .lote-name::before{content:"▸ ";color:var(--txt2)}
 #tbl-peca .peca-count{font-family:var(--font-d);font-size:9px;color:var(--txt2);letter-spacing:1px;text-transform:uppercase;margin-left:8px}
 #tbl-peca .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
+#tbl-peca .peca-prog{font-family:var(--font-d);font-size:11px;color:var(--txt2);margin-right:8px}
+#tbl-peca .peca-prog b{color:var(--txt)}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
@@ -527,7 +529,7 @@ function renderPrazo(){
     inp.addEventListener("change",e=>{
       const lote=e.target.dataset.lote, v=e.target.value;
       if(v) localStorage.setItem(LS_PRAZO+lote,v); else localStorage.removeItem(LS_PRAZO+lote);
-      renderPrazo(); renderKpis();
+      renderPrazo(); renderKpis(); renderPeca();
     });
   });
 }
@@ -614,9 +616,12 @@ function renderPeca(){
     anyShown=true;
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+    const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—"; const st=statusFor(lote);
     h+=`<tr class='peca-lote' data-lote='${esc(lote)}'>
       <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?` <span class='lote-desc'>${esc(desc)}</span>`:""}<span class='peca-count'>${pecas.length} peça(s)</span></td>
-      <td class='num'>${fmt(totC)}</td><td colspan='5'></td></tr>`;
+      <td class='num'>${fmt(totC)}</td>
+      <td colspan='2'></td>
+      <td class='l' colspan='3'><span class='peca-prog'>Programada: <b>${progBR}</b></span>${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""} <span class='badge ${st.cls}'>${st.txt}</span></td></tr>`;
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
       const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
@@ -720,7 +725,7 @@ function applyProg(prog, file){
     }
   }
   if(AGG){
-    renderPrazo(); renderKpis();
+    renderPrazo(); renderKpis(); renderPeca();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
     setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.n} datas · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
   } else {
@@ -733,7 +738,7 @@ function limparManuais(){
     const key=localStorage.key(i);
     if(key && key.indexOf(LS_PRAZO)===0) localStorage.removeItem(key);
   }
-  if(AGG){ renderPrazo(); renderKpis(); setProgInfo("Datas manuais limpas.", false); }
+  if(AGG){ renderPrazo(); renderKpis(); renderPeca(); setProgInfo("Datas manuais limpas.", false); }
 }
 
 function handleProg(file){
@@ -790,13 +795,14 @@ function exportCsv(){
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
-    rows.push(["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Último corte","Máquina","Operador"]);
+    rows.push(["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]);
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
+      const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
     }
   }
@@ -831,13 +837,14 @@ function exportPorOperador(){
     addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""));
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
-    const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Último corte","Máquina","Operador"]];
+    const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
+      const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        aoa.push([lote, p.cod, p.desc, p.cortado, p.planejado, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        aoa.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
