@@ -121,6 +121,8 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-lote.collapsed td:first-child .lote-name::before{content:"▸ ";color:var(--txt2)}
 #tbl-peca .peca-count{font-family:var(--font-d);font-size:9px;color:var(--txt2);letter-spacing:1px;text-transform:uppercase;margin-left:8px}
 #tbl-peca .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
+.peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
+  padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
 /* Status badges */
 .badge{display:inline-block;font-family:var(--font-d);font-size:10px;font-weight:600;text-transform:uppercase;
@@ -153,7 +155,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 @media print{
   @page{ size:A4 landscape; margin:11mm; }
   html,body{background:#fff !important;color:#111 !important}
-  header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar{display:none !important}
+  header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn{display:none !important}
   main{max-width:100% !important;padding:0 !important}
   .print-only{display:block}
   #print-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:12px}
@@ -252,6 +254,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <input type="file" id="file-prod" accept=".xlsx,.xls" class="hidden">
       </div>
       <div id="peca-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (mesmo período do corte) para ver as peças de cada lote. Você também pode simplesmente arrastar esse arquivo na tela.</div>
+      <div id="peca-warn" class="peca-warn" style="display:none"></div>
       <div id="peca-searchbar" class="prazo-actions" style="display:none">
         <input type="search" id="peca-search" placeholder="Buscar peça (código ou descrição)…" autocomplete="off">
         <span id="peca-info" class="prog-info">Clique num lote para recolher/expandir.</span>
@@ -293,6 +296,8 @@ const LS_PROG  = "rastreioCorte:prog";    // JSON {"129/26":"2026-07-13",...} da
 let PROG_MAP = {};
 try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG_MAP={}; }
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
+let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
+let PROD_PERIOD = "";   // "Período de:" do relatório por Produto — p/ avisar se forem períodos diferentes
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
@@ -400,9 +405,10 @@ function parseProgramacao(wb){
 function parseProduto(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  const map={}; let n=0, cur=null;
+  const map={}; let n=0, cur=null, period="";
   for(const row of rows){
     const c = row||[];
+    for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
     if(c[1]==="PRODUTO"){ cur={cod:String(c[2]||"").trim(), desc:String(c[3]||"").trim()}; continue; }
     if(c[0]==="ORDEM") continue;                 // cabeçalho de colunas
     if(typeof c[0]==="number"){                  // linha de operação → mapeia ORDEM p/ a peça vigente
@@ -410,7 +416,7 @@ function parseProduto(wb){
       continue;
     }
   }
-  return {map,n};
+  return {map,n,period};
 }
 
 /* ---------- aggregate ---------- */
@@ -570,13 +576,29 @@ function renderFunc(){
 }
 
 // "Peças cortadas por lote": só cortado>0, agrupado por lote (cabeçalho recolhível) + busca.
+// normaliza "Período de:" p/ comparar (espaços/caixa)
+function normPeriod(s){ return String(s||"").replace(/\s+/g," ").trim().toLowerCase(); }
+// avisos quando os dois relatórios parecem de períodos/escopos diferentes
+function pecaAlertMsg(){
+  if(!Object.keys(PECA_MAP).length || !AGG) return "";
+  const msgs=[];
+  const nf=normPeriod(FUNC_PERIOD), np=normPeriod(PROD_PERIOD);
+  if(nf && np && nf!==np) msgs.push(`Períodos diferentes — Corte: “${esc(FUNC_PERIOD)}” × Produto: “${esc(PROD_PERIOD)}”. Confira se os dois relatórios são do mesmo período.`);
+  let cob=0, tot=0;
+  for(const r of AGG.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
+  if(tot && cob/tot<0.8) msgs.push(`Só ${cob}/${tot} operações cortadas casaram com uma peça (${Math.round(cob/tot*100)}%). Pode ser relatório de período ou escopo diferente.`);
+  return msgs.join(" ");
+}
+
 function renderPeca(){
   const hasPeca=Object.keys(PECA_MAP).length>0;
   const empty=document.getElementById("peca-empty");
   const wrap=document.getElementById("peca-wrap");
   const sbar=document.getElementById("peca-searchbar");
-  if(!hasPeca){ empty.style.display="block"; wrap.style.display="none"; sbar.style.display="none"; return; }
+  const warn=document.getElementById("peca-warn");
+  if(!hasPeca){ empty.style.display="block"; wrap.style.display="none"; sbar.style.display="none"; if(warn) warn.style.display="none"; return; }
   empty.style.display="none"; wrap.style.display=""; sbar.style.display="flex";
+  if(warn){ const m=pecaAlertMsg(); if(m){ warn.innerHTML="⚠ "+m; warn.style.display="block"; } else warn.style.display="none"; }
 
   const q=(document.getElementById("peca-search").value||"").trim().toLowerCase();
   const byLote=buildPecaLote();
@@ -643,6 +665,7 @@ function renderKpis(){
 }
 
 function renderAll(period){
+  FUNC_PERIOD = period || "";
   document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
   renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca();
@@ -731,6 +754,7 @@ function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); i
 // guarda o mapa ordem->peça e re-renderiza. Se o Corte ainda não veio, avisa.
 function applyPeca(prod, file){
   PECA_MAP = prod.map;
+  PROD_PERIOD = prod.period || "";
   if(AGG){
     renderKpis(); renderPeca();
     let cob=0, tot=0;
