@@ -7,10 +7,15 @@ arrasta o arquivo na tela e o painel monta na hora:
 
 - **Cortado por lote & data** — a matriz consolidada (Data × Lote) que antes era feita na mão.
 - **Por funcionário** — quanto cada pessoa cortou, por lote.
+- **Peças cortadas por lote** — **qual peça** saiu de cada lote (código + descrição), quanto
+  foi cortado × o planejado, último corte, máquina e operador. Para isso, carregue **também**
+  o relatório **“Rel Planilhamento por Produto”** (botão na seção Peças, ou arraste na tela) —
+  o painel cruza os dois pelo **nº da ORDEM**. Tem busca de peça (código/descrição).
 - **Prazo por lote** — você informa a **data-meta** de cada lote (quando ele deveria estar
   cortado) e o painel marca **🟢 no prazo / 🟡 em andamento / 🔴 atrasado**. A data-meta
   fica guardada no próprio navegador (`localStorage`).
-- **Exportar** — baixa a consolidação em `.csv`.
+- **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça) ou `.xlsx`
+  (uma aba por operador + aba **Peças por lote**).
 
 Tudo roda **no navegador** — nenhum dado é enviado para a internet.
 
@@ -29,3 +34,12 @@ O relatório traz, por funcionário, uma linha por operação de corte (ORDEM, Q
 DATA, MÁQUINA, horário) e, logo abaixo de cada operação, uma linha `Lote` com o código
 (`LT 129/26`, …). O painel soma a `QTDE PROD.` por **lote** e por **data**. Para comparar
 vários dias, basta exportar o relatório com um **período maior**.
+
+### Peça × lote (dois relatórios)
+O relatório “por Funcionário” **não traz a descrição da peça** — ele só tem o lote. A peça
+está no **“Rel Planilhamento por Produto”**, onde cada bloco é um **PRODUTO = a peça**
+(código + descrição) com suas operações (ORDEM, QTDE ORDEM, QTDE PROD., …). Como os dois
+relatórios compartilham o **nº da ORDEM**, o painel liga `ORDEM → peça` (do Produto) com
+`ORDEM → lote` (do Funcionário) e monta o **“Peças cortadas por lote”**. Exporte os dois do
+**mesmo período**. Só conta como cortada a operação com `QTDE PROD. > 0`. Nada é enviado à
+internet — o cruzamento acontece no navegador.

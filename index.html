@@ -110,6 +110,18 @@ td.zero{color:var(--txt3)}
 .lote-name{font-family:var(--font-d);font-weight:600;color:var(--txt)}
 .lote-desc{color:var(--txt2);font-size:11px}
 
+/* Peças por lote */
+#peca-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:6px 10px;border-radius:5px;min-width:280px;flex:0 1 340px}
+#peca-search:focus{outline:none;border-color:var(--acc)}
+#tbl-peca .peca-lote{cursor:pointer}
+#tbl-peca .peca-lote td{background:var(--elevated);font-weight:600;border-top:1px solid var(--border)}
+#tbl-peca .peca-lote:hover td{background:#2a2a2a}
+#tbl-peca .peca-lote td:first-child .lote-name::before{content:"▾ ";color:var(--acc)}
+#tbl-peca .peca-lote.collapsed td:first-child .lote-name::before{content:"▸ ";color:var(--txt2)}
+#tbl-peca .peca-count{font-family:var(--font-d);font-size:9px;color:var(--txt2);letter-spacing:1px;text-transform:uppercase;margin-left:8px}
+#tbl-peca .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
+
 /* Status badges */
 .badge{display:inline-block;font-family:var(--font-d);font-size:10px;font-weight:600;text-transform:uppercase;
   letter-spacing:.5px;padding:3px 9px;border-radius:20px;white-space:nowrap}
@@ -154,6 +166,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   /* cada tabela larga começa em página nova, sem cortar ao meio */
   #sec-matriz{break-before:page;page-break-before:always}
   #sec-func{break-before:page;page-break-before:always}
+  #sec-peca{break-before:page;page-break-before:always}
+  #tbl-peca .peca-lote td{background:#eee !important;color:#111 !important;font-weight:700}
+  #tbl-peca .peca-cod{color:#111 !important;font-weight:700}
   .kpis{display:flex;gap:6px;margin-bottom:12px}
   .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
@@ -228,6 +243,22 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="tbl-wrap"><table id="tbl-prazo"></table></div>
     </section>
 
+    <section id="sec-peca">
+      <h2>Peças cortadas por lote <span class="tag">o que saiu de cada lote</span></h2>
+      <div class="sec-sub">Cruza o corte com o relatório <b>“Rel Planilhamento por Produto”</b> (pelo nº da <b>ORDEM</b>) e mostra <b>qual peça foi cortada</b> em cada lote — quanto saiu × o planejado. Carregue os dois relatórios do <b>mesmo período</b>.</div>
+      <div class="prazo-actions">
+        <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
+        <span id="prod-info" class="prog-info"></span>
+        <input type="file" id="file-prod" accept=".xlsx,.xls" class="hidden">
+      </div>
+      <div id="peca-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (mesmo período do corte) para ver as peças de cada lote. Você também pode simplesmente arrastar esse arquivo na tela.</div>
+      <div id="peca-searchbar" class="prazo-actions" style="display:none">
+        <input type="search" id="peca-search" placeholder="Buscar peça (código ou descrição)…" autocomplete="off">
+        <span id="peca-info" class="prog-info">Clique num lote para recolher/expandir.</span>
+      </div>
+      <div class="tbl-wrap" id="peca-wrap" style="display:none"><table id="tbl-peca"></table></div>
+    </section>
+
     <section id="sec-matriz">
       <h2>Cortado por lote &amp; data <span class="tag">matriz data × lote</span></h2>
       <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.</div>
@@ -261,6 +292,7 @@ const LS_PRAZO = "rastreioCorte:prazo:";  // + loteKey  -> yyyy-mm-dd (data-meta
 const LS_PROG  = "rastreioCorte:prog";    // JSON {"129/26":"2026-07-13",...} datas da Programação (coluna B)
 let PROG_MAP = {};
 try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG_MAP={}; }
+let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
@@ -333,6 +365,7 @@ function parseWorkbook(wb){
     if(typeof c[0]==="number"){
       // QTDE PROD. é peça: conta só a parte inteira (trunca frações como 33,3400 / 0,3334)
       lastOp = { ordem:c[0], qtde:Math.trunc(parseBR(c[2])), data:String(c[3]||"").trim(),
+                 maq: String(c[5]||"").trim(),
                  func: curFunc || String(c[7]||"").trim() || "—",
                  funcCod: curFuncCod || String(c[6]||"").trim() || "" };
       continue;
@@ -355,6 +388,26 @@ function parseProgramacao(wb){
       const k=loteKeyNorm(c); if(!k) continue;
       const iso=cellToISO(r[1]);                          // coluna B = data prevista (CORTE MDP UNI 1)
       if(iso){ map[k]=iso; n++; }
+    }
+  }
+  return {map,n};
+}
+
+/* ---------- parse "Rel Planilhamento por Produto" (peça = PRODUTO; chave = nº da ORDEM) ----------
+   Blocos:  [_, "PRODUTO", <cód>, <descrição>]  seguidos de linhas de operação
+   Operação (0-based): 0=ORDEM 1=QTDE ORDEM 2=QTDE PROD. 3=DATA 4=MÁQcód 5=MÁQnome 6=FUNCcód 7=FUNCnome
+   Devolve ordem -> {cod, desc, qtdeOrdem}. Só liga a peça ao lote via ORDEM (o outro relatório traz o lote). */
+function parseProduto(wb){
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const map={}; let n=0, cur=null;
+  for(const row of rows){
+    const c = row||[];
+    if(c[1]==="PRODUTO"){ cur={cod:String(c[2]||"").trim(), desc:String(c[3]||"").trim()}; continue; }
+    if(c[0]==="ORDEM") continue;                 // cabeçalho de colunas
+    if(typeof c[0]==="number"){                  // linha de operação → mapeia ORDEM p/ a peça vigente
+      if(cur){ map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:Math.trunc(parseBR(c[1]))}; n++; }
+      continue;
     }
   }
   return {map,n};
@@ -404,6 +457,26 @@ function buildMatrix(list){
   const lotes=[...lotesSet].sort((a,b)=>loteNum(a)-loteNum(b));
   const datas=[...datasSet].sort((a,b)=>brToDate(a)-brToDate(b));
   return {mat,loteT,dataT,lotes,datas,grand};
+}
+
+// Cruza os registros de corte (que têm ordem+lote) com PECA_MAP (ordem->peça) e agrupa por lote → peça.
+// Ordem é única, então cada operação tem 1 peça e 1 lote. Retorna { lote: {pecas:{cod->obj}, totCort} }.
+function buildPecaLote(){
+  const byLote={}, ordVista=new Set();
+  for(const r of (AGG?AGG.recs:[])){
+    const p = PECA_MAP[r.ordem] || null;
+    const L = byLote[r.lote] || (byLote[r.lote]={pecas:{}, totCort:0});
+    const cod  = p ? p.cod  : "—";
+    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const P = L.pecas[cod] || (L.pecas[cod]={cod, desc, cortado:0, planejado:0, datas:new Set(), maqs:new Set(), ops:new Set()});
+    P.cortado += r.qtde;
+    if(p && !ordVista.has(r.ordem)){ P.planejado += (p.qtdeOrdem||0); ordVista.add(r.ordem); } // planejado 1x por ordem
+    if(r.data) P.datas.add(r.data);
+    if(r.maq)  P.maqs.add(r.maq);
+    if(r.func) P.ops.add(r.func);
+    L.totCort += r.qtde;
+  }
+  return byLote;
 }
 
 /* ---------- render ---------- */
@@ -496,6 +569,59 @@ function renderFunc(){
   t.innerHTML=h;
 }
 
+// "Peças cortadas por lote": só cortado>0, agrupado por lote (cabeçalho recolhível) + busca.
+function renderPeca(){
+  const hasPeca=Object.keys(PECA_MAP).length>0;
+  const empty=document.getElementById("peca-empty");
+  const wrap=document.getElementById("peca-wrap");
+  const sbar=document.getElementById("peca-searchbar");
+  if(!hasPeca){ empty.style.display="block"; wrap.style.display="none"; sbar.style.display="none"; return; }
+  empty.style.display="none"; wrap.style.display=""; sbar.style.display="flex";
+
+  const q=(document.getElementById("peca-search").value||"").trim().toLowerCase();
+  const byLote=buildPecaLote();
+  const lotes=Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b));
+  const t=document.getElementById("tbl-peca");
+  let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th>Planejado</th><th>%</th><th>Último corte</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
+  let anyShown=false;
+  for(const lote of lotes){
+    let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
+    if(q) pecas=pecas.filter(p=>(p.cod+" "+p.desc).toLowerCase().includes(q));
+    if(!pecas.length) continue;
+    pecas.sort((a,b)=>b.cortado-a.cortado);
+    anyShown=true;
+    const totC=pecas.reduce((s,p)=>s+p.cortado,0);
+    const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+    h+=`<tr class='peca-lote' data-lote='${esc(lote)}'>
+      <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?` <span class='lote-desc'>${esc(desc)}</span>`:""}<span class='peca-count'>${pecas.length} peça(s)</span></td>
+      <td class='num'>${fmt(totC)}</td><td colspan='5'></td></tr>`;
+    for(const p of pecas){
+      const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+      const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
+      h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
+        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+        <td class='num'>${fmt(p.cortado)}</td>
+        <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
+        <td class='num'>${pct}</td>
+        <td class='num'>${ult?dateToBR(ult):"—"}</td>
+        <td class='l'>${esc([...p.maqs].join(", "))}</td>
+        <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
+    }
+  }
+  h+="</tbody>";
+  if(!anyShown) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
+  t.innerHTML=h;
+  // recolher/expandir por lote (as peça-rows vêm logo após o cabeçalho do lote)
+  t.querySelectorAll(".peca-lote").forEach(hr=>{
+    hr.addEventListener("click",()=>{
+      hr.classList.toggle("collapsed");
+      const col=hr.classList.contains("collapsed");
+      let el=hr.nextElementSibling;
+      while(el && el.classList.contains("peca-row") && el.dataset.lote===hr.dataset.lote){ el.style.display=col?"none":""; el=el.nextElementSibling; }
+    });
+  });
+}
+
 function renderKpis(){
   const k=document.getElementById("kpis");
   let atrasados=0, semMeta=0;
@@ -508,13 +634,18 @@ function renderKpis(){
     {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
     {lbl:"Sem data-meta", val:semMeta, cls:semMeta?"warn":"ok"},
   ];
+  if(Object.keys(PECA_MAP).length){
+    const set=new Set();
+    for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
+    cards.push({lbl:"Peças cortadas", val:set.size, sub:"tipos", cls:""});
+  }
   k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
 }
 
 function renderAll(period){
   document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
-  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc();
+  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca();
   if(Object.keys(PROG_MAP).length){
     let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
     setProgInfo(`✓ Programação carregada (${Object.keys(PROG_MAP).length} datas) · ${c} lote(s) com prazo automático.`, false);
@@ -534,10 +665,12 @@ function handleFile(file){
       const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
       const {period,recs}=parseWorkbook(wb);
       if(!recs.length){
-        // talvez seja a planilha da Programação (auto-detecção)
+        // auto-detecção: relatório "por Produto" (peças) ou a Programação (datas-meta)
+        const prod=parseProduto(wb);
+        if(prod.n){ applyPeca(prod,file); return; }
         const prog=parseProgramacao(wb);
         if(prog.n){ applyProg(prog,file); return; }
-        showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for a Programação, use o botão “Puxar datas da Programação” na seção Prazo por lote).");
+        showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
         return;
       }
       AGG=aggregate(recs);
@@ -593,6 +726,33 @@ function handleProg(file){
   rdr.readAsArrayBuffer(file);
 }
 
+/* ---------- relatório "por Produto" (peças) ---------- */
+function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); if(!e) return; e.textContent=msg; e.style.color=warn?"var(--warn)":"var(--ok)"; }
+// guarda o mapa ordem->peça e re-renderiza. Se o Corte ainda não veio, avisa.
+function applyPeca(prod, file){
+  PECA_MAP = prod.map;
+  if(AGG){
+    renderKpis(); renderPeca();
+    let cob=0, tot=0;
+    for(const r of AGG.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
+    setProdInfo(`✓ Produto${file?" ("+file.name+")":""}: ${prod.n} peças · ${cob}/${tot} operações cortadas com peça identificada.`, false);
+  } else {
+    showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — as peças aparecem por lote.`);
+  }
+}
+function handleProduto(file){
+  const rdr=new FileReader();
+  rdr.onload=ev=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+      const prod=parseProduto(wb);
+      if(!prod.n){ setProdInfo("⚠ Não achei peças/ORDEM nessa planilha (esperado “Rel Planilhamento por Produto”).", true); return; }
+      applyPeca(prod,file);
+    }catch(err){ setProdInfo("⚠ Erro ao ler o relatório por Produto: "+err.message, true); }
+  };
+  rdr.readAsArrayBuffer(file);
+}
+
 /* export csv */
 function exportCsv(){
   if(!AGG) return;
@@ -603,6 +763,19 @@ function exportCsv(){
   rows.push([]);
   rows.push(["Lote","Cortado","Data programada","Prazo","Status"]);
   for(const l of AGG.lotes){ const s=statusFor(l); rows.push([l, AGG.loteT[l], s.iso?dateToBR(s.prazo):"", s.delta, s.txt]); }
+  if(Object.keys(PECA_MAP).length){
+    rows.push([]);
+    rows.push(["Peças cortadas por lote"]);
+    rows.push(["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Último corte","Máquina","Operador"]);
+    const byLote=buildPecaLote();
+    for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
+      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
+      for(const p of pecas){
+        const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+        rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      }
+    }
+  }
   const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="consolidacao_corte.csv"; a.click();
@@ -633,6 +806,18 @@ function exportPorOperador(){
     const primeiroNome=String(o.nome||"").split(/\s+/)[0]||"";
     addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""));
   }
+  if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
+    const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Último corte","Máquina","Operador"]];
+    const byLote=buildPecaLote();
+    for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
+      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
+      for(const p of pecas){
+        const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+        aoa.push([lote, p.cod, p.desc, p.cortado, p.planejado, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
+  }
   XLSX.writeFile(wb, "rastreio_por_operador.xlsx");
 }
 
@@ -662,6 +847,12 @@ const fileProg=document.getElementById("file-prog");
 document.getElementById("btn-prog").addEventListener("click",()=>fileProg.click());
 fileProg.addEventListener("change",e=>{ if(e.target.files[0]) handleProg(e.target.files[0]); fileProg.value=""; });
 document.getElementById("btn-limpar").addEventListener("click",limparManuais);
+
+/* botão / arquivo do relatório por Produto (peças) + busca */
+const fileProd=document.getElementById("file-prod");
+document.getElementById("btn-prod").addEventListener("click",()=>fileProd.click());
+fileProd.addEventListener("change",e=>{ if(e.target.files[0]) handleProduto(e.target.files[0]); fileProd.value=""; });
+document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) renderPeca(); });
 
 /* gerar PDF (impressão do navegador -> Salvar como PDF) */
 document.getElementById("btn-pdf").addEventListener("click",()=>{
