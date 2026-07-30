@@ -156,6 +156,18 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-lote.st-warn td:first-child{background:#3a2c19}
 #tbl-peca .peca-lote.st-ok td:first-child{background:#1e2f1f}
 #tbl-peca .peca-lote.st-mute td:first-child{background:var(--elevated)}
+/* matriz: 2ª linha do cabeçalho com a data em que o lote DEVERIA ter sido cortado */
+#tbl-matriz .trprog th{text-transform:none;letter-spacing:0;font-size:11px;padding:5px 14px;
+  border-bottom:1px solid var(--border);z-index:3}
+#tbl-matriz .trprog th:first-child{font-size:9px;text-transform:uppercase;letter-spacing:1px;z-index:4}
+#tbl-matriz .trprog .prog-on{color:var(--txt)}
+#tbl-matriz .trprog .prog-off{color:var(--txt3)}
+/* verde = o lote fechou até a meta · vermelho = o último corte passou dela */
+#tbl-matriz .trprog th.dv-ok{color:var(--ok)}
+#tbl-matriz .trprog th.dv-red{color:var(--red)}
+/* a célula do dia que era a meta do lote fica marcada na coluna dele */
+#tbl-matriz td.cel-meta{box-shadow:inset 0 0 0 1px rgba(255,92,31,.55)}
+
 /* desvio embaixo da data realizada: cortou antes (−) ou depois (+) da programada */
 .desvio{font-family:var(--font-d);font-size:9.5px;letter-spacing:.5px;margin-top:2px;font-weight:600}
 .dv-ok{color:var(--ok)} .dv-red{color:var(--red)}
@@ -760,16 +772,33 @@ function renderMatriz(){
   const M = OP_FILTER ? buildMatrix(AGG.recs.filter(r=>r.funcCod===OP_FILTER)) : AGG;
   let h="<thead><tr><th class='l'>Data</th>";
   for(const l of M.lotes) h+=`<th>${esc(l)}</th>`;
-  h+="<th>Total dia</th></tr></thead><tbody>";
+  h+="<th>Total dia</th></tr>";
+  // 2ª linha do cabeçalho: quando cada lote DEVERIA estar cortado (Programação ou data digitada).
+  // Fica logo embaixo do LT pra dar pra comparar com os dias em que ele realmente saiu.
+  h+="<tr class='trprog'><th class='l'>Programada</th>";
+  for(const l of M.lotes){
+    const g=getMeta(l), st=statusFor(l);
+    const cor = st.desvio===null||st.desvio===undefined ? "" : (st.desvio>0?" dv-red":" dv-ok");
+    h+=`<th class='${g.iso?"prog-on"+cor:"prog-off"}' title='${esc(l)}${st.delta?" — "+esc(st.delta):""}'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</th>`;
+  }
+  h+="<th></th></tr></thead><tbody>";
   for(const d of M.datas){
     h+=`<tr><td class='l num'>${d}</td>`;
-    for(const l of M.lotes){ const v=M.mat[d+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
+    for(const l of M.lotes){
+      const v=M.mat[d+"|"+l]||0;
+      const meta=getMeta(l).iso;                         // marca a célula do dia em que era a meta
+      const alvo = meta && isoToDate(meta) && dateToBR(isoToDate(meta))===d ? " cel-meta" : "";
+      h+=`<td class='num ${v?"":"zero"}${alvo}'>${v?fmt(v):"·"}</td>`;
+    }
     h+=`<td class='num'>${fmt(M.dataT[d])}</td></tr>`;
   }
   h+="<tr class='trtot'><td class='l'>Total cortado</td>";
   for(const l of M.lotes) h+=`<td>${fmt(M.loteT[l])}</td>`;
   h+=`<td>${fmt(M.grand)}</td></tr></tbody>`;
   t.innerHTML=h;
+  // a 2ª linha do cabeçalho gruda logo abaixo da 1ª (altura medida, não chutada)
+  const h1=t.querySelector("thead tr").offsetHeight;
+  t.querySelectorAll("thead .trprog th").forEach(th=>{ th.style.top=h1+"px"; });
 }
 
 // preenche o seletor de operador (código) da matriz
@@ -1202,6 +1231,7 @@ function exportCsv(){
   if(!AGG) return;
   const rows=[];
   rows.push(["Data", ...AGG.lotes, "Total dia"]);
+  rows.push(["Programada", ...AGG.lotes.map(l=>{ const g=getMeta(l); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
   for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), AGG.dataT[d]]); }
   rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.grand]);
   rows.push([]);
