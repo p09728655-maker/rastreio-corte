@@ -15,7 +15,14 @@ arrasta o arquivo na tela e o painel monta na hora:
   exatamente **quais peças saíram naquela data** (código, descrição, lote, quanto foi cortado,
   máquina e operador). Tem dois modos: **lista por dia** (padrão, mais fácil de ler) e
   **matriz data × peça** (uma coluna por dia, agrupada por lote). Usa os mesmos dois relatórios
-  da seção Peças.
+  da seção Peças. A ordem das peças é **por lote e código** (padrão) ou **maior quantidade** —
+  o seletor vale para as duas seções de peça e para os arquivos exportados.
+- **Dias de corte (o lote saiu de uma vez ou foi picado?)** — na tabela **Prazo por lote**, uma
+  coluna diz em **quantos dias** cada lote foi cortado e **quanto saiu em cada dia**. Quando o lote
+  ficou **parado no meio** — teve dia em que a fábrica cortou outras coisas e ele não andou — o
+  painel marca `N dias · parou P` em vermelho. Fim de semana e feriado não contam como parada,
+  porque o cálculo usa só os dias em que houve produção no arquivo. Dois KPIs no topo: **Lotes em
+  +1 dia** e **Lotes que pararam**.
 - **Prazo por lote** — você informa a **data-meta** de cada lote (quando ele deveria estar
   cortado) e o painel marca **🟢 no prazo / 🟡 em andamento / 🔴 atrasado**. A data-meta
   fica guardada no próprio navegador (`localStorage`).

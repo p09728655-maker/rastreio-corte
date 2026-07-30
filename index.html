@@ -116,6 +116,10 @@ td.zero{color:var(--txt3)}
 .trtot td{background:var(--elevated);font-weight:700;font-family:var(--font-d);border-top:1px solid var(--border)}
 .lote-name{font-family:var(--font-d);font-weight:600;color:var(--txt)}
 .lote-desc{color:var(--txt2);font-size:11px}
+/* "Dias de corte": o lote saiu num dia só ou foi picado em vários? */
+#tbl-prazo .dias-cell{white-space:normal;min-width:190px;max-width:340px}
+#tbl-prazo .dias-list{font-family:var(--font-d);font-size:10.5px;color:var(--txt2);margin-top:4px;line-height:1.6}
+#tbl-prazo .dias-list b{color:var(--txt);font-weight:600}
 
 /* Peças por lote */
 #peca-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
@@ -149,9 +153,10 @@ td.zero{color:var(--txt3)}
 #pd-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:6px 10px;border-radius:5px;min-width:280px;flex:0 1 340px}
 #pd-search:focus{outline:none;border-color:var(--acc)}
-#pd-mode{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+#pd-mode,.ord-sel{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer}
-#pd-mode:focus{outline:none;border-color:var(--acc)}
+#pd-mode:focus,.ord-sel:focus{outline:none;border-color:var(--acc)}
+.ord-lbl{display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)}
 #tbl-pecadata .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
 /* na matriz a coluna da peça é congelada: limita a largura pra sobrar espaço pros dias.
    Na lista por dia não precisa — a descrição aparece inteira. */
@@ -302,7 +307,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
       <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.
-        <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>. 🟢 "No prazo" significa que não houve corte depois da meta, e não que o lote está concluído.</div>
+        <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>. 🟢 "No prazo" significa que não houve corte depois da meta, e não que o lote está concluído.
+        A coluna <b>“Dias de corte”</b> mostra se o lote saiu de uma vez ou foi <b>picado em vários dias</b>, com quanto saiu em cada um.
+        <b>“parou N”</b> quer dizer que, entre o primeiro e o último corte do lote, teve <b>N dias em que a fábrica cortou outras coisas e esse lote não andou</b> (fim de semana e feriado não contam).</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
         <button class="linkbtn" id="btn-limpar" style="margin:0">Limpar datas manuais</button>
@@ -326,6 +333,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div id="peca-warn" class="peca-warn" style="display:none"></div>
       <div id="peca-searchbar" class="prazo-actions" style="display:none">
         <input type="search" id="peca-search" placeholder="Buscar peça (código ou descrição)…" autocomplete="off">
+        <label class="prog-info ord-lbl">Ordenar:
+          <select class="ord-sel" data-ord="1">
+            <option value="lote">Lote e peça (código)</option>
+            <option value="qtde">Maior quantidade</option>
+          </select>
+        </label>
         <span id="peca-info" class="prog-info">Clique num lote para recolher/expandir.</span>
       </div>
       <div class="tbl-wrap" id="peca-wrap" style="display:none"><table id="tbl-peca"></table></div>
@@ -351,10 +364,16 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div id="pd-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (botão na seção <b>Peças cortadas por lote</b>, acima) para ver as peças de cada dia.</div>
       <div id="pd-bar" class="prazo-actions" style="display:none">
         <input type="search" id="pd-search" placeholder="Buscar peça (código ou descrição)…" autocomplete="off">
-        <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Ver como:
+        <label class="prog-info ord-lbl">Ver como:
           <select id="pd-mode">
             <option value="dia">Lista por dia</option>
             <option value="matriz">Matriz data × peça</option>
+          </select>
+        </label>
+        <label class="prog-info ord-lbl">Ordenar:
+          <select class="ord-sel" data-ord="1">
+            <option value="lote">Lote e peça (código)</option>
+            <option value="qtde">Maior quantidade</option>
           </select>
         </label>
         <span id="pd-info" class="prog-info"></span>
@@ -625,6 +644,15 @@ function buildPecaMatriz(){
 
 /* ---------- render ---------- */
 let AGG=null;
+
+// Ordem das peças nas listas. Padrão: por LOTE e depois por CÓDIGO da peça — é como a fábrica lê
+// (o mesmo produto sempre no mesmo lugar). A outra opção põe a maior quantidade primeiro.
+let PECA_ORD="lote";
+function ordenaPecas(list, qtdeDe){
+  const porCod=(a,b)=>String(a.cod||"").localeCompare(String(b.cod||""),"pt-BR",{numeric:true});
+  if(PECA_ORD==="qtde") return list.sort((a,b)=> qtdeDe(b)-qtdeDe(a) || porCod(a,b));
+  return list.sort((a,b)=> (loteNum(a.lote||"")-loteNum(b.lote||"")) || porCod(a,b));
+}
 let OP_FILTER="";   // "" = todos; senão = código do operador selecionado na matriz
 
 function statusFor(lote){
@@ -643,17 +671,38 @@ function statusFor(lote){
   return {iso,prazo,first,last,cls,txt,delta,src:meta.src};
 }
 
+// Em quantos dias o lote foi cortado, quanto saiu em cada um, e quantos dias ele ficou PARADO no meio.
+// "Parado" conta só dias em que a fábrica cortou alguma coisa (qualquer lote) e esse lote não andou —
+// assim não precisa saber o calendário de trabalho: fim de semana e feriado não viram falsa parada.
+function diasDoLote(lote){
+  const datas = AGG.datas.filter(d=>(AGG.mat[d+"|"+lote]||0)>0);      // AGG.datas já vem ordenado
+  const dist  = datas.map(d=>({data:d, qtde:AGG.mat[d+"|"+lote]}));
+  let parados=0;
+  if(datas.length>1){
+    const ini=brToDate(datas[0]), fim=brToDate(datas[datas.length-1]), set=new Set(datas);
+    for(const d of AGG.datas){ const dd=brToDate(d); if(dd>=ini && dd<=fim && !set.has(d)) parados++; }
+  }
+  const n=datas.length;
+  let cls="b-mute", txt="—";
+  if(n===1)      { cls="b-mute"; txt="1 dia"; }
+  else if(n>1)   { cls=parados?"b-red":"b-warn";
+                   txt = n+" dias" + (parados? ` · parou ${parados}` : " seguidos"); }
+  return {datas, dist, n, parados, cls, txt};
+}
+
 function renderPrazo(){
   const t=document.getElementById("tbl-prazo");
-  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1º corte</th><th>Último corte</th><th class='l'>Data programada</th><th class='l'>Prazo</th><th class='l'>Status</th></tr></thead><tbody>";
+  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1º corte</th><th>Último corte</th><th class='l'>Dias de corte</th><th class='l'>Data programada</th><th class='l'>Prazo</th><th class='l'>Status</th></tr></thead><tbody>";
   for(const lote of AGG.lotes){
     const s=statusFor(lote);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+    const D=diasDoLote(lote);
     h+=`<tr>
       <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
+      <td class='l dias-cell'><span class='badge ${D.cls}'>${esc(D.txt)}</span>${D.dist.length>1?`<div class='dias-list'>${D.dist.map(x=>`${esc(x.data.slice(0,5))} <b>${fmt(x.qtde)}</b>`).join(" · ")}</div>`:""}</td>
       <td class='l'><input type='date' data-lote='${esc(lote)}' value='${s.iso}'><span class='print-date'>${s.iso?dateToBR(s.prazo):"—"}</span>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
       <td class='l' style='color:var(--txt2)'>${s.delta||"—"}</td>
       <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
@@ -768,7 +817,7 @@ function renderPeca(){
     let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
     if(q) pecas=pecas.filter(p=>(p.cod+" "+p.desc).toLowerCase().includes(q));
     if(!pecas.length) continue;
-    pecas.sort((a,b)=>b.cortado-a.cortado);
+    ordenaPecas(pecas, p=>p.cortado);
     anyShown=true;
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
@@ -859,7 +908,7 @@ function renderPdDia(t, info, q, match){
   for(const D of dias){
     let pecas=Object.values(D.pecas).filter(match);
     if(!pecas.length) continue;
-    pecas.sort((a,b)=> b.cortado-a.cortado || a.cod.localeCompare(b.cod));
+    ordenaPecas(pecas, p=>p.cortado);
     const tot=pecas.reduce((s,p)=>s+p.cortado,0);
     const lotes=[...new Set(pecas.map(p=>p.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
     nDias++; nLinhas+=pecas.length; totPc+=tot;
@@ -897,7 +946,7 @@ function renderPdMatriz(t, info, q, match){
   const lotes=[...new Set(rows.map(r=>r.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
   const colTot={};
   for(const lote of lotes){
-    const doLote=rows.filter(r=>r.lote===lote).sort((a,b)=> b.tot-a.tot || a.cod.localeCompare(b.cod));
+    const doLote=ordenaPecas(rows.filter(r=>r.lote===lote), r=>r.tot);
     const st=statusFor(lote);
     const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
     const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—";
@@ -928,13 +977,18 @@ function renderPdMatriz(t, info, q, match){
 
 function renderKpis(){
   const k=document.getElementById("kpis");
-  let atrasados=0, semMeta=0;
-  for(const l of AGG.lotes){ const s=statusFor(l); if(s.cls==="b-red") atrasados++; if(s.cls==="b-mute") semMeta++; }
+  let atrasados=0, semMeta=0, varios=0, picados=0;
+  for(const l of AGG.lotes){
+    const s=statusFor(l); if(s.cls==="b-red") atrasados++; if(s.cls==="b-mute") semMeta++;
+    const d=diasDoLote(l); if(d.n>1) varios++; if(d.parados) picados++;
+  }
   const cards=[
     {lbl:"Total cortado", val:fmt(AGG.grand), sub:"peças", cls:""},
     {lbl:"Lotes", val:AGG.lotes.length, cls:""},
     {lbl:"Funcionários", val:AGG.funcs.length, cls:""},
     {lbl:"Dias no arquivo", val:AGG.datas.length, cls:""},
+    {lbl:"Lotes em +1 dia", val:varios, sub:varios?("de "+AGG.lotes.length):"", cls:varios?"warn":"ok"},
+    {lbl:"Lotes que pararam", val:picados, sub:"no meio", cls:picados?"red":"ok"},
     {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
     {lbl:"Sem data-meta", val:semMeta, cls:semMeta?"warn":"ok"},
   ];
@@ -1077,8 +1131,13 @@ function exportCsv(){
   for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), AGG.dataT[d]]); }
   rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.grand]);
   rows.push([]);
-  rows.push(["Lote","Cortado","Data programada","Prazo","Status"]);
-  for(const l of AGG.lotes){ const s=statusFor(l); rows.push([l, AGG.loteT[l], s.iso?dateToBR(s.prazo):"", s.delta, s.txt]); }
+  rows.push(["Lote","Cortado","1º corte","Último corte","Dias de corte","Dias parado no meio","Cortado em cada dia","Data programada","Prazo","Status"]);
+  for(const l of AGG.lotes){
+    const s=statusFor(l), D=diasDoLote(l);
+    rows.push([l, AGG.loteT[l], dateToBR(s.first), dateToBR(s.last), D.n, D.parados,
+               D.dist.map(x=>x.data+": "+x.qtde).join(" | "),
+               s.iso?dateToBR(s.prazo):"", s.delta, s.txt]);
+  }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
@@ -1086,7 +1145,7 @@ function exportCsv(){
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
-      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
+      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
         rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
@@ -1097,7 +1156,7 @@ function exportCsv(){
     rows.push(["Peças cortadas em cada dia"]);
     rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]);
     for(const D of buildPecaDia()){
-      for(const p of Object.values(D.pecas).sort((a,b)=>b.cortado-a.cortado)){
+      for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
         rows.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
       rows.push(["", "", "", "Total do dia", "", D.tot, "", ""]);
@@ -1138,7 +1197,7 @@ function exportPorOperador(){
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
-      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0).sort((a,b)=>b.cortado-a.cortado);
+      const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
         aoa.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
@@ -1149,7 +1208,7 @@ function exportPorOperador(){
     // aba: o que foi cortado em cada dia, peça a peça (mesma leitura da tela)
     const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]];
     for(const D of buildPecaDia()){
-      for(const p of Object.values(D.pecas).sort((a,b)=>b.cortado-a.cortado)){
+      for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
         dd.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
       dd.push(["","","","Total do dia","",D.tot,"",""]);
@@ -1159,7 +1218,7 @@ function exportPorOperador(){
     // aba: matriz data × peça (uma coluna por dia)
     const M=buildPecaMatriz();
     const mx=[["Lote","Peça (código)","Peça (descrição)", ...M.datas, "Total"]];
-    const ordenadas=M.rows.slice().sort((a,b)=> loteNum(a.lote)-loteNum(b.lote) || b.tot-a.tot || a.cod.localeCompare(b.cod));
+    const ordenadas=ordenaPecas(M.rows.slice(), r=>r.tot);
     for(const r of ordenadas) mx.push([r.lote, r.cod, r.desc, ...M.datas.map(d=>r.byData[d]||0), r.tot]);
     mx.push(["Total do dia","","", ...M.datas.map(d=>M.dataT[d]||0), M.grand]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mx), "Data x Peça");
@@ -1204,6 +1263,15 @@ document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) re
 /* "Peças cortadas em cada dia": busca + modo (lista por dia × matriz data × peça) */
 document.getElementById("pd-search").addEventListener("input",()=>{ if(AGG) renderPecaData(); });
 document.getElementById("pd-mode").addEventListener("change",e=>{ PD_MODE=e.target.value; if(AGG) renderPecaData(); });
+
+/* ordenação das peças: os dois seletores (seção Peças e seção Dias) mexem no mesmo ajuste */
+document.querySelectorAll(".ord-sel").forEach(sel=>{
+  sel.addEventListener("change",e=>{
+    PECA_ORD=e.target.value;
+    document.querySelectorAll(".ord-sel").forEach(s=>{ s.value=PECA_ORD; });
+    if(AGG){ renderPeca(); renderPecaData(); }
+  });
+});
 
 /* gerar PDF (impressão do navegador -> Salvar como PDF) */
 document.getElementById("btn-pdf").addEventListener("click",()=>{
