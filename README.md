@@ -49,6 +49,12 @@ relatórios compartilham o **nº da ORDEM**, o painel liga `ORDEM → peça` (do
 **mesmo período**. Só conta como cortada a operação com `QTDE PROD. > 0`. Nada é enviado à
 internet — o cruzamento acontece no navegador.
 
+**Dá pra carregar vários relatórios por Produto.** Eles se **somam** (`ORDEM → peça`), então se o
+Corte pega a semana inteira e o Produto do sistema sai de um dia só, é só carregar um de cada dia.
+Toda ordem cortada que não estiver em nenhum Produto carregado aparece como **“sem peça”**, e o
+painel avisa **exatamente em que dias** isso aconteceu — é o sinal de que faltou carregar aquele
+período. O botão **“Limpar peças carregadas”** zera o conjunto.
+
 ### Rastreio da data com a peça
 Cada operação do relatório por Funcionário já traz **ORDEM + DATA + lote**. Com o `ORDEM → peça`
 do relatório por Produto, o painel sabe **peça + lote + data + quantidade** de cada corte — é isso
