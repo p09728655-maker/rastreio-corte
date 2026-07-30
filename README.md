@@ -11,11 +11,16 @@ arrasta o arquivo na tela e o painel monta na hora:
   foi cortado × o planejado, último corte, máquina e operador. Para isso, carregue **também**
   o relatório **“Rel Planilhamento por Produto”** (botão na seção Peças, ou arraste na tela) —
   o painel cruza os dois pelo **nº da ORDEM**. Tem busca de peça (código/descrição).
+- **Peças cortadas em cada dia** — o **rastreio da data mostrando a peça**: abra um dia e veja
+  exatamente **quais peças saíram naquela data** (código, descrição, lote, quanto foi cortado,
+  máquina e operador). Tem dois modos: **lista por dia** (padrão, mais fácil de ler) e
+  **matriz data × peça** (uma coluna por dia, agrupada por lote). Usa os mesmos dois relatórios
+  da seção Peças.
 - **Prazo por lote** — você informa a **data-meta** de cada lote (quando ele deveria estar
   cortado) e o painel marca **🟢 no prazo / 🟡 em andamento / 🔴 atrasado**. A data-meta
   fica guardada no próprio navegador (`localStorage`).
-- **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça) ou `.xlsx`
-  (uma aba por operador + aba **Peças por lote**).
+- **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça e o que saiu em cada dia)
+  ou `.xlsx` (uma aba por operador + abas **Peças por lote**, **Peças por dia** e **Data x Peça**).
 
 Tudo roda **no navegador** — nenhum dado é enviado para a internet.
 
@@ -43,3 +48,10 @@ relatórios compartilham o **nº da ORDEM**, o painel liga `ORDEM → peça` (do
 `ORDEM → lote` (do Funcionário) e monta o **“Peças cortadas por lote”**. Exporte os dois do
 **mesmo período**. Só conta como cortada a operação com `QTDE PROD. > 0`. Nada é enviado à
 internet — o cruzamento acontece no navegador.
+
+### Rastreio da data com a peça
+Cada operação do relatório por Funcionário já traz **ORDEM + DATA + lote**. Com o `ORDEM → peça`
+do relatório por Produto, o painel sabe **peça + lote + data + quantidade** de cada corte — é isso
+que a seção **“Peças cortadas em cada dia”** mostra. Os totais por dia batem, peça por peça, com a
+linha “Total dia” da matriz por lote. O relatório do sistema às vezes gruda o rótulo
+`Total de horas:` na coluna da máquina; nesses casos o painel usa o **código** da máquina (`SEC01`).

@@ -86,23 +86,30 @@ tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#191919}
 
 /* ---- colunas congeladas (Data à esquerda, Total à direita) p/ tabelas largas ---- */
-#tbl-matriz td:first-child,#tbl-func td:first-child,#tbl-prazo td:first-child{
+#tbl-matriz td:first-child,#tbl-func td:first-child,#tbl-prazo td:first-child,#tbl-pecadata td:first-child{
   position:sticky;left:0;background:var(--surface);z-index:1;
   box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
-#tbl-matriz th:first-child,#tbl-func th:first-child,#tbl-prazo th:first-child{
+#tbl-matriz th:first-child,#tbl-func th:first-child,#tbl-prazo th:first-child,#tbl-pecadata th:first-child{
   position:sticky;left:0;background:var(--elevated);z-index:3;
   box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
-#tbl-matriz td:last-child,#tbl-func td:last-child{
+/* a coluna Total só congela no modo matriz (na lista por dia a última coluna é texto) */
+#tbl-matriz td:last-child,#tbl-func td:last-child,#tbl-pecadata.mx td:last-child{
   position:sticky;right:0;background:var(--surface);z-index:1;
   box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
-#tbl-matriz th:last-child,#tbl-func th:last-child{
+#tbl-matriz th:last-child,#tbl-func th:last-child,#tbl-pecadata.mx th:last-child{
   position:sticky;right:0;background:var(--elevated);z-index:3;
   box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
 /* linha de total: manter fundo elevado nas células congeladas, acima das demais */
-#tbl-matriz .trtot td:first-child,#tbl-func .trtot td:first-child,
-#tbl-matriz .trtot td:last-child,#tbl-func .trtot td:last-child{background:var(--elevated);z-index:2}
+#tbl-matriz .trtot td:first-child,#tbl-func .trtot td:first-child,#tbl-pecadata .trtot td:first-child,
+#tbl-matriz .trtot td:last-child,#tbl-func .trtot td:last-child,#tbl-pecadata.mx .trtot td:last-child{background:var(--elevated);z-index:2}
+/* cabeçalho de lote na matriz de peças: a coluna congelada acompanha a faixa de status */
+#tbl-pecadata .pd-grp.st-red td:first-child,#tbl-pecadata.mx .pd-grp.st-red td:last-child{background:#3a1f1e}
+#tbl-pecadata .pd-grp.st-warn td:first-child,#tbl-pecadata.mx .pd-grp.st-warn td:last-child{background:#3a2c19}
+#tbl-pecadata .pd-grp.st-ok td:first-child,#tbl-pecadata.mx .pd-grp.st-ok td:last-child{background:#1e2f1f}
+#tbl-pecadata .pd-grp.st-mute td:first-child,#tbl-pecadata.mx .pd-grp.st-mute td:last-child{background:var(--elevated)}
 /* hover casa o fundo das células congeladas */
 #tbl-matriz tbody tr:hover td:first-child,#tbl-func tbody tr:hover td:first-child,#tbl-prazo tbody tr:hover td:first-child,
+#tbl-pecadata tbody tr:hover td:first-child,#tbl-pecadata.mx tbody tr:hover td:last-child,
 #tbl-matriz tbody tr:hover td:last-child,#tbl-func tbody tr:hover td:last-child{background:#191919}
 td.num{font-family:var(--font-d)}
 td.zero{color:var(--txt3)}
@@ -137,6 +144,43 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-lote .badge{font-size:11px;padding:4px 11px}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
+
+/* Peças por data (matriz data × peça) */
+#pd-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:6px 10px;border-radius:5px;min-width:280px;flex:0 1 340px}
+#pd-search:focus{outline:none;border-color:var(--acc)}
+#pd-mode{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer}
+#pd-mode:focus{outline:none;border-color:var(--acc)}
+#tbl-pecadata .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
+/* na matriz a coluna da peça é congelada: limita a largura pra sobrar espaço pros dias.
+   Na lista por dia não precisa — a descrição aparece inteira. */
+#tbl-pecadata.mx td:first-child{max-width:420px;overflow:hidden;text-overflow:ellipsis}
+#tbl-pecadata .pd-lotes{color:var(--txt2);font-size:11px;font-family:var(--font-d)}
+/* cabeçalho do lote: mesma faixa por status da seção Peças, mas com os totais do lote em cada dia */
+#tbl-pecadata .pd-grp{cursor:pointer}
+#tbl-pecadata .pd-grp td{border-top:2px solid var(--bg);font-weight:700;font-family:var(--font-d)}
+#tbl-pecadata .pd-grp.st-red td{background:rgba(244,67,54,.14)}
+#tbl-pecadata .pd-grp.st-warn td{background:rgba(255,152,0,.14)}
+#tbl-pecadata .pd-grp.st-ok td{background:rgba(76,175,80,.13)}
+#tbl-pecadata .pd-grp.st-mute td{background:var(--elevated)}
+#tbl-pecadata .pd-grp:hover td{filter:brightness(1.18)}
+#tbl-pecadata .pd-lote{color:var(--acc);font-size:14px}
+#tbl-pecadata .pd-lote::before{content:"▾ ";color:var(--txt2);font-size:11px}
+#tbl-pecadata .pd-grp.collapsed .pd-lote::before{content:"▸ "}
+#tbl-pecadata .pd-prog{font-family:var(--font-d);font-size:10px;letter-spacing:.5px;color:var(--txt2);
+  text-transform:uppercase;font-weight:400;margin-left:8px}
+/* cabeçalho do dia (lista por dia) */
+#tbl-pecadata .pd-dia{color:var(--acc);font-size:15px;font-family:var(--font-d);font-weight:700}
+#tbl-pecadata .pd-dia::before{content:"▾ ";color:var(--txt2);font-size:11px}
+#tbl-pecadata .pd-grp.collapsed .pd-dia::before{content:"▸ "}
+#tbl-pecadata .pd-sem{color:var(--txt2);font-size:11px;font-family:var(--font-d);text-transform:uppercase;
+  letter-spacing:1px;margin-left:8px;font-weight:400}
+#tbl-pecadata .pd-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+#tbl-pecadata .pd-meta{font-family:var(--font-d);font-size:11px;color:var(--txt2);
+  font-weight:400;text-transform:none;letter-spacing:0}
+#tbl-pecadata .pd-meta b{color:var(--txt)}
+#tbl-pecadata .pd-lotelist{color:var(--txt2);font-size:11px;font-family:var(--font-d);font-weight:400}
 
 /* Status badges */
 .badge{display:inline-block;font-family:var(--font-d);font-size:10px;font-weight:600;text-transform:uppercase;
@@ -183,8 +227,15 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #sec-matriz{break-before:page;page-break-before:always}
   #sec-func{break-before:page;page-break-before:always}
   #sec-peca{break-before:page;page-break-before:always}
+  #sec-pecadata{break-before:page;page-break-before:always}
   #tbl-peca .peca-lote td{background:#eee !important;color:#111 !important;font-weight:700}
   #tbl-peca .peca-cod{color:#111 !important;font-weight:700}
+  #tbl-pecadata .pd-grp td{background:#eee !important;color:#111 !important;font-weight:700}
+  #tbl-pecadata .pd-dia,#tbl-pecadata .pd-lote,#tbl-pecadata .peca-cod{color:#111 !important;font-weight:700}
+  #tbl-pecadata .pd-sem,#tbl-pecadata .pd-meta,#tbl-pecadata .pd-lotelist,#tbl-pecadata .pd-prog{color:#555 !important}
+  #tbl-pecadata td:first-child{max-width:none;position:static !important;box-shadow:none !important}
+  /* impresso: mostra tudo, mesmo o que estiver recolhido na tela */
+  #tbl-pecadata .pd-item{display:table-row !important}
   .kpis{display:flex;gap:6px;margin-bottom:12px}
   .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
@@ -290,6 +341,25 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="tbl-wrap"><table id="tbl-matriz"></table></div>
     </section>
 
+    <section id="sec-pecadata">
+      <h2>Peças cortadas em cada dia <span class="tag">rastreio da data, peça a peça</span></h2>
+      <div class="sec-sub">O mesmo rastreio de datas da matriz por lote, só que <b>mostrando a peça</b>: abra um dia e veja
+        <b>exatamente quais peças foram cortadas naquela data</b> (código, descrição, lote, quanto saiu, máquina e operador).
+        Precisa do <b>“Rel Planilhamento por Produto”</b> carregado na seção Peças (mesmo período do Corte).</div>
+      <div id="pd-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (botão na seção <b>Peças cortadas por lote</b>, acima) para ver as peças de cada dia.</div>
+      <div id="pd-bar" class="prazo-actions" style="display:none">
+        <input type="search" id="pd-search" placeholder="Buscar peça (código ou descrição)…" autocomplete="off">
+        <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Ver como:
+          <select id="pd-mode">
+            <option value="dia">Lista por dia</option>
+            <option value="matriz">Matriz data × peça</option>
+          </select>
+        </label>
+        <span id="pd-info" class="prog-info"></span>
+      </div>
+      <div class="tbl-wrap" id="pd-wrap" style="display:none"><table id="tbl-pecadata"></table></div>
+    </section>
+
     <section id="sec-func">
       <h2>Por funcionário <span class="tag">quem cortou o quê</span></h2>
       <div class="tbl-wrap"><table id="tbl-func"></table></div>
@@ -385,8 +455,12 @@ function parseWorkbook(wb){
     // operation row: col 0 numeric = ORDEM
     if(typeof c[0]==="number"){
       // QTDE PROD. é peça: conta só a parte inteira (trunca frações como 33,3400 / 0,3334)
+      // Em algumas linhas o relatório do sistema joga o rótulo "Total de horas:" na coluna da máquina
+      // (a linha de totais vem grudada na última operação). Nesse caso usa o código da máquina (col 4).
+      const maqNome = String(c[5]||"").trim();
+      const maqOk = /^total de horas/i.test(maqNome) ? String(c[4]||"").trim() : maqNome;
       lastOp = { ordem:c[0], qtde:Math.trunc(parseBR(c[2])), data:String(c[3]||"").trim(),
-                 maq: String(c[5]||"").trim(),
+                 maq: maqOk,
                  func: curFunc || String(c[7]||"").trim() || "—",
                  funcCod: curFuncCod || String(c[6]||"").trim() || "" };
       continue;
@@ -501,6 +575,49 @@ function buildPecaLote(){
   return byLote;
 }
 
+// Rastreio da data com a peça junto: mesma base do "Cortado por lote & data" (ordem+lote+data+qtde
+// do relatório por Funcionário), só que com a peça (cód+descrição) que veio do relatório por Produto.
+// Agrupa por DIA -> "o que foi cortado no dia 23/07": peça, lote, quanto saiu, máquina e operador.
+// Só entra operação com QTDE PROD. > 0 (o que realmente saiu), igual à seção "Peças cortadas por lote".
+function buildPecaDia(){
+  const byDia={};
+  for(const r of (AGG?AGG.recs:[])){
+    if(!(r.qtde>0)) continue;
+    const p    = PECA_MAP[r.ordem] || null;
+    const cod  = p ? p.cod  : "—";
+    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const D = byDia[r.data] || (byDia[r.data]={data:r.data, tot:0, lotes:new Set(), pecas:{}});
+    const k = r.lote+"␟"+cod;                 // mesma peça em lotes diferentes = linhas diferentes
+    const P = D.pecas[k] || (D.pecas[k]={cod, desc, lote:r.lote, cortado:0, maqs:new Set(), ops:new Set()});
+    P.cortado += r.qtde;
+    if(r.maq)  P.maqs.add(r.maq);
+    if(r.func) P.ops.add(r.func);
+    D.tot += r.qtde; D.lotes.add(r.lote);
+  }
+  return Object.values(byDia).sort((a,b)=>brToDate(a.data)-brToDate(b.data));
+}
+
+// Mesma base, no formato cruzado: uma linha por (lote, peça) e uma coluna por dia.
+function buildPecaMatriz(){
+  const rows={}, dataT={}, loteDataT={}, loteT={}, datasSet=new Set(); let grand=0;
+  for(const r of (AGG?AGG.recs:[])){
+    if(!(r.qtde>0)) continue;
+    const p    = PECA_MAP[r.ordem] || null;
+    const cod  = p ? p.cod  : "—";
+    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const k = r.lote+"␟"+cod;
+    const row = rows[k] || (rows[k]={lote:r.lote, cod, desc, tot:0, byData:{}});
+    row.byData[r.data]=(row.byData[r.data]||0)+r.qtde;
+    row.tot += r.qtde;
+    dataT[r.data]=(dataT[r.data]||0)+r.qtde;
+    loteDataT[r.lote+"|"+r.data]=(loteDataT[r.lote+"|"+r.data]||0)+r.qtde;
+    loteT[r.lote]=(loteT[r.lote]||0)+r.qtde;
+    datasSet.add(r.data); grand+=r.qtde;
+  }
+  const datas=[...datasSet].sort((a,b)=>brToDate(a)-brToDate(b));
+  return {rows:Object.values(rows), datas, dataT, loteDataT, loteT, grand};
+}
+
 /* ---------- render ---------- */
 let AGG=null;
 let OP_FILTER="";   // "" = todos; senão = código do operador selecionado na matriz
@@ -543,7 +660,7 @@ function renderPrazo(){
     inp.addEventListener("change",e=>{
       const lote=e.target.dataset.lote, v=e.target.value;
       if(v) localStorage.setItem(LS_PRAZO+lote,v); else localStorage.removeItem(LS_PRAZO+lote);
-      renderPrazo(); renderKpis(); renderPeca();
+      renderPrazo(); renderKpis(); renderPeca(); renderPecaData();
     });
   });
 }
@@ -674,6 +791,116 @@ function renderPeca(){
   });
 }
 
+/* ---------- "Peças cortadas em cada dia": o rastreio da data mostrando a peça ---------- */
+const SEMANA=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+let PD_MODE="dia";   // "dia" = lista por dia (padrão, mais fácil de ler) | "matriz" = data × peça
+
+function diaSemana(br){ const d=brToDate(br); return d? SEMANA[d.getDay()] : ""; }
+
+function renderPecaData(){
+  const hasPeca=Object.keys(PECA_MAP).length>0;
+  const empty=document.getElementById("pd-empty");
+  const bar=document.getElementById("pd-bar");
+  const wrap=document.getElementById("pd-wrap");
+  const info=document.getElementById("pd-info");
+  const t=document.getElementById("tbl-pecadata");
+  if(!t) return;
+  if(!hasPeca || !AGG){ empty.style.display="block"; bar.style.display="none"; wrap.style.display="none"; return; }
+  empty.style.display="none"; bar.style.display="flex"; wrap.style.display="";
+
+  const q=(document.getElementById("pd-search").value||"").trim().toLowerCase();
+  const match=p=>!q || (p.cod+" "+p.desc+" "+p.lote).toLowerCase().includes(q);
+  t.className = PD_MODE==="matriz" ? "mx" : "";
+
+  if(PD_MODE==="dia") renderPdDia(t, info, q, match);
+  else                renderPdMatriz(t, info, q, match);
+
+  // recolher/expandir: as linhas do grupo vêm logo depois do cabeçalho, com o mesmo data-grp
+  t.querySelectorAll(".pd-grp").forEach(hr=>{
+    hr.addEventListener("click",()=>{
+      hr.classList.toggle("collapsed");
+      const col=hr.classList.contains("collapsed");
+      let el=hr.nextElementSibling;
+      while(el && el.classList.contains("pd-item") && el.dataset.grp===hr.dataset.grp){ el.style.display=col?"none":""; el=el.nextElementSibling; }
+    });
+  });
+}
+
+// Lista por dia: um bloco por data, e dentro dele as peças que saíram naquele dia.
+function renderPdDia(t, info, q, match){
+  const dias=buildPecaDia();
+  let h="<thead><tr><th class='l'>Peça cortada no dia</th><th class='l'>Lote</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
+  let nDias=0, nLinhas=0, totPc=0;
+  for(const D of dias){
+    let pecas=Object.values(D.pecas).filter(match);
+    if(!pecas.length) continue;
+    pecas.sort((a,b)=> b.cortado-a.cortado || a.cod.localeCompare(b.cod));
+    const tot=pecas.reduce((s,p)=>s+p.cortado,0);
+    const lotes=[...new Set(pecas.map(p=>p.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
+    nDias++; nLinhas+=pecas.length; totPc+=tot;
+    h+=`<tr class='pd-grp st-mute' data-grp='${esc(D.data)}'>
+      <td class='l' colspan='5'><div class='pd-row'>
+        <span class='pd-dia'>${esc(D.data)}</span>
+        <span class='pd-sem'>${esc(diaSemana(D.data))}</span>
+        <span class='pd-meta'>${pecas.length} peça(s) diferente(s) · <b>${fmt(tot)}</b> pç cortadas</span>
+        <span class='pd-lotelist'>${lotes.length} lote(s): ${esc(lotes.join(", "))}</span>
+      </div></td></tr>`;
+    for(const p of pecas){
+      h+=`<tr class='pd-item' data-grp='${esc(D.data)}'>
+        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+        <td class='l'><span class='lote-name'>${esc(p.lote)}</span></td>
+        <td class='num'>${fmt(p.cortado)}</td>
+        <td class='l'>${esc([...p.maqs].join(", "))}</td>
+        <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
+    }
+  }
+  h+="</tbody>";
+  if(!nDias) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
+  t.innerHTML=h;
+  if(info) info.textContent=nDias?`${nDias} dia(s) · ${nLinhas} linha(s) · ${fmt(totPc)} pç. Clique no dia para recolher.`:"";
+}
+
+// Matriz data × peça: uma coluna por dia, agrupada por lote (com a faixa de status do lote).
+function renderPdMatriz(t, info, q, match){
+  const M=buildPecaMatriz();
+  const rows=M.rows.filter(match);
+  // só as datas que sobraram depois do filtro, pra tabela não ficar com colunas vazias
+  const datas=M.datas.filter(d=>rows.some(r=>r.byData[d]));
+  let h="<thead><tr><th class='l'>Peça</th>";
+  for(const d of datas) h+=`<th>${esc(d)}</th>`;
+  h+="<th>Total</th></tr></thead><tbody>";
+  const lotes=[...new Set(rows.map(r=>r.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
+  const colTot={};
+  for(const lote of lotes){
+    const doLote=rows.filter(r=>r.lote===lote).sort((a,b)=> b.tot-a.tot || a.cod.localeCompare(b.cod));
+    const st=statusFor(lote);
+    const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
+    const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—";
+    h+=`<tr class='pd-grp ${stKey}' data-grp='${esc(lote)}'>
+      <td class='l'><span class='pd-lote'>${esc(lote)}</span><span class='pd-prog'>prog. ${esc(progBR)}</span></td>`;
+    let totLote=0;
+    for(const d of datas){
+      const v=doLote.reduce((s,r)=>s+(r.byData[d]||0),0);
+      totLote+=v; colTot[d]=(colTot[d]||0)+v;
+      h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`;
+    }
+    h+=`<td class='num'>${fmt(totLote)}</td></tr>`;
+    for(const r of doLote){
+      h+=`<tr class='pd-item' data-grp='${esc(lote)}'>
+        <td class='l'><span class='mono peca-cod'>${esc(r.cod)}</span> ${esc(r.desc)}</td>`;
+      for(const d of datas){ const v=r.byData[d]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
+      h+=`<td class='num'>${fmt(r.tot)}</td></tr>`;
+    }
+  }
+  const grand=datas.reduce((s,d)=>s+(colTot[d]||0),0);
+  h+="<tr class='trtot'><td class='l'>Total do dia</td>";
+  for(const d of datas) h+=`<td>${fmt(colTot[d]||0)}</td>`;
+  h+=`<td>${fmt(grand)}</td></tr></tbody>`;
+  if(!rows.length) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
+  t.innerHTML=h;
+  if(info) info.textContent=rows.length?`${rows.length} peça(s) × ${datas.length} dia(s) · ${fmt(grand)} pç. Clique no lote para recolher.`:"";
+}
+
 function renderKpis(){
   const k=document.getElementById("kpis");
   let atrasados=0, semMeta=0;
@@ -698,7 +925,7 @@ function renderAll(period){
   FUNC_PERIOD = period || "";
   document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
-  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca();
+  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca(); renderPecaData();
   if(Object.keys(PROG_MAP).length){
     let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
     setProgInfo(`✓ Programação carregada (${Object.keys(PROG_MAP).length} datas) · ${c} lote(s) com prazo automático.`, false);
@@ -750,7 +977,7 @@ function applyProg(prog, file){
     }
   }
   if(AGG){
-    renderPrazo(); renderKpis(); renderPeca();
+    renderPrazo(); renderKpis(); renderPeca(); renderPecaData();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
     setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.n} datas · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
   } else {
@@ -763,7 +990,7 @@ function limparManuais(){
     const key=localStorage.key(i);
     if(key && key.indexOf(LS_PRAZO)===0) localStorage.removeItem(key);
   }
-  if(AGG){ renderPrazo(); renderKpis(); renderPeca(); setProgInfo("Datas manuais limpas.", false); }
+  if(AGG){ renderPrazo(); renderKpis(); renderPeca(); renderPecaData(); setProgInfo("Datas manuais limpas.", false); }
 }
 
 function handleProg(file){
@@ -786,7 +1013,7 @@ function applyPeca(prod, file){
   PECA_MAP = prod.map;
   PROD_PERIOD = prod.period || "";
   if(AGG){
-    renderKpis(); renderPeca();
+    renderKpis(); renderPeca(); renderPecaData();
     let cob=0, tot=0;
     for(const r of AGG.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
     setProdInfo(`✓ Produto${file?" ("+file.name+")":""}: ${prod.n} peças · ${cob}/${tot} operações cortadas com peça identificada.`, false);
@@ -829,6 +1056,16 @@ function exportCsv(){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
         rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
+    }
+    // rastreio da data com a peça: o que saiu em cada dia
+    rows.push([]);
+    rows.push(["Peças cortadas em cada dia"]);
+    rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]);
+    for(const D of buildPecaDia()){
+      for(const p of Object.values(D.pecas).sort((a,b)=>b.cortado-a.cortado)){
+        rows.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      }
+      rows.push(["", "", "", "Total do dia", "", D.tot, "", ""]);
     }
   }
   const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
@@ -873,6 +1110,24 @@ function exportPorOperador(){
       }
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
+
+    // aba: o que foi cortado em cada dia, peça a peça (mesma leitura da tela)
+    const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]];
+    for(const D of buildPecaDia()){
+      for(const p of Object.values(D.pecas).sort((a,b)=>b.cortado-a.cortado)){
+        dd.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      }
+      dd.push(["","","","Total do dia","",D.tot,"",""]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dd), "Peças por dia");
+
+    // aba: matriz data × peça (uma coluna por dia)
+    const M=buildPecaMatriz();
+    const mx=[["Lote","Peça (código)","Peça (descrição)", ...M.datas, "Total"]];
+    const ordenadas=M.rows.slice().sort((a,b)=> loteNum(a.lote)-loteNum(b.lote) || b.tot-a.tot || a.cod.localeCompare(b.cod));
+    for(const r of ordenadas) mx.push([r.lote, r.cod, r.desc, ...M.datas.map(d=>r.byData[d]||0), r.tot]);
+    mx.push(["Total do dia","","", ...M.datas.map(d=>M.dataT[d]||0), M.grand]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mx), "Data x Peça");
   }
   XLSX.writeFile(wb, "rastreio_por_operador.xlsx");
 }
@@ -909,6 +1164,10 @@ const fileProd=document.getElementById("file-prod");
 document.getElementById("btn-prod").addEventListener("click",()=>fileProd.click());
 fileProd.addEventListener("change",e=>{ if(e.target.files[0]) handleProduto(e.target.files[0]); fileProd.value=""; });
 document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) renderPeca(); });
+
+/* "Peças cortadas em cada dia": busca + modo (lista por dia × matriz data × peça) */
+document.getElementById("pd-search").addEventListener("input",()=>{ if(AGG) renderPecaData(); });
+document.getElementById("pd-mode").addEventListener("change",e=>{ PD_MODE=e.target.value; if(AGG) renderPecaData(); });
 
 /* gerar PDF (impressão do navegador -> Salvar como PDF) */
 document.getElementById("btn-pdf").addEventListener("click",()=>{
