@@ -171,6 +171,19 @@ td.zero{color:var(--txt3)}
 /* desvio embaixo da data realizada: cortou antes (−) ou depois (+) da programada */
 .desvio{font-family:var(--font-d);font-size:9.5px;letter-spacing:.5px;margin-top:2px;font-weight:600}
 .dv-ok{color:var(--ok)} .dv-red{color:var(--red)}
+
+/* MDF × MDP: o MDF corta antes (vai pra pintura), então tem data própria na Programação */
+/* largura fixa: com ou sem etiqueta, o código da peça começa sempre na mesma coluna */
+.mat-tag{display:inline-block;font-family:var(--font-d);font-size:8.5px;font-weight:700;letter-spacing:.5px;
+  padding:1px 0;border-radius:3px;margin-right:6px;vertical-align:middle;width:34px;text-align:center}
+.mat-vazio{display:inline-block;width:34px;margin-right:6px}
+.mat-MDF{background:rgba(126,87,194,.18);color:#b39ddb;border:.5px solid rgba(126,87,194,.5)}
+.mat-MDP{background:rgba(38,166,154,.15);color:#80cbc4;border:.5px solid rgba(38,166,154,.45)}
+#tbl-prazo .st-mat{display:flex;align-items:center;gap:6px;margin-bottom:4px;white-space:nowrap}
+#tbl-prazo .st-nota{font-family:var(--font-d);font-size:9.5px;color:var(--txt3);margin-top:4px;white-space:normal;max-width:220px}
+#tbl-prazo th small{text-transform:none;letter-spacing:0;color:var(--txt3)}
+#tbl-matriz .trprog .prog-lin{display:flex;align-items:center;justify-content:flex-end;gap:4px;line-height:1.5}
+#tbl-matriz .trprog .prog-lin .mat-tag{margin-right:0}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
@@ -272,7 +285,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
   body.modo-ficha main,body.modo-ficha header,body.modo-ficha footer{display:none !important}
   body.modo-ficha #ficha{display:block !important}
-  @page{ size:A4 portrait; margin:12mm }
+  /* nada de @page aqui: a regra do topo (A4 paisagem) vale pra ficha também — a tabela é larga
+     e, em retrato, as datas e a descrição não cabem na mesma linha */
   .fx-cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:10px}
   .fx-cab .fx-logo{height:30px}
   .fx-cab .fx-tit{font-family:var(--font-h);font-weight:700;font-size:20px;color:#111}
@@ -285,12 +299,25 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   .fx-alerta{border:1.5px solid #c62828;color:#c62828;font-weight:700}
   .fx-linha{font-family:var(--font-d);font-size:9.5px;color:#333;margin-bottom:8px;line-height:1.6}
   .fx-linha b{color:#111}
-  #ficha table{width:100%;border-collapse:collapse;font-size:10px}
+  /* larguras travadas: os números e as datas caem sempre na mesma coluna, linha a linha */
+  #ficha table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed}
   #ficha th{background:#eee !important;color:#111 !important;border:1px solid #bbb;padding:4px 6px;
     font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
   #ficha th.l,#ficha td.l{text-align:left}
-  #ficha td{border:1px solid #ccc;padding:4px 6px;text-align:right;color:#111}
+  #ficha th.c,#ficha td.c{text-align:center}
+  #ficha td{border:1px solid #ccc;padding:4px 6px;text-align:right;color:#111;
+    font-family:var(--font-d);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #ficha td.l{font-family:inherit}
+  /* o desvio ocupa largura fixa, então as datas ficam alinhadas mesmo com "+3 d" ou "no dia" */
+  #ficha td.fx-real .fx-dv{display:inline-block;width:38px;text-align:right;margin-left:5px}
+  #ficha tr.fx-sub td{background:#f6f6f6 !important;border-top:1.5px solid #999}
   #ficha tr.falta td{background:#fdecea !important;font-weight:700}
+  #ficha .fx-grp{font-family:var(--font-d);font-size:10px;font-weight:700;color:#111;background:#f0f0f0;
+    border:1px solid #bbb;border-bottom:none;padding:4px 6px;margin-top:8px}
+  #ficha .fx-dv{font-family:var(--font-d);font-size:8px;font-weight:700}
+  #ficha .fx-dv.atr{color:#c62828} #ficha .fx-dv.adi{color:#2e7d32}
+  #ficha .fx-sobra{color:#e65100;font-weight:700}
+  #ficha .fx-card .l+.v+.l{margin-top:2px}
   #ficha td.ok-box{width:58px;background:#fff}   /* espaço pro operador marcar de caneta */
   #ficha .fx-rod{margin-top:14px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
   #ficha .fx-rod div{flex:1;border-top:1px solid #111;padding-top:3px}
@@ -504,10 +531,24 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
 <script>
 "use strict";
-const LS_PRAZO = "rastreioCorte:prazo:";  // + loteKey  -> yyyy-mm-dd (data-meta manual)
-const LS_PROG  = "rastreioCorte:prog";    // JSON {"129/26":"2026-07-13",...} datas da Programação (coluna B)
+const LS_PRAZO = "rastreioCorte:prazo:";  // + lote + ":MDF"/":MDP" -> yyyy-mm-dd (data-meta manual)
+const LS_PROG  = "rastreioCorte:prog";    // JSON {"129/26":{mdf,mdp},...} — as duas datas da Programação
 let PROG_MAP = {};
 try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG_MAP={}; }
+// migra o formato antigo (uma data só por lote, que era a coluna B = MDP)
+(function migraProg(){
+  let mudou=false;
+  for(const k in PROG_MAP){ if(typeof PROG_MAP[k]==="string"){ PROG_MAP[k]={mdf:"", mdp:PROG_MAP[k]}; mudou=true; } }
+  if(mudou) try{ localStorage.setItem(LS_PROG, JSON.stringify(PROG_MAP)); }catch(e){}
+  for(let i=localStorage.length-1;i>=0;i--){
+    const key=localStorage.key(i);
+    if(key && key.indexOf(LS_PRAZO)===0 && !/:(MDF|MDP)$/.test(key)){
+      const v=localStorage.getItem(key);
+      localStorage.setItem(key+":MDP", v);      // a data manual antiga cobrava o MDP
+      localStorage.removeItem(key);
+    }
+  }
+})();
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
 let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
 let PROD_PERIOD = "";   // "Período de:" do último relatório por Produto — p/ avisar se forem períodos diferentes
@@ -548,13 +589,36 @@ function cellToISO(v){
   const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){ let y=+m[3]; if(y<100)y+=2000; return y+"-"+String(+m[2]).padStart(2,"0")+"-"+String(+m[1]).padStart(2,"0"); }
   return "";
 }
-// meta efetiva de um lote: manual (digitada) tem prioridade sobre a da Programação
-function getMeta(lote){
-  const manual = localStorage.getItem(LS_PRAZO+lote);
-  if(manual) return {iso:manual, src:"manual"};
-  const k=loteKeyNorm(lote); const prog = k? PROG_MAP[k] : null;
-  if(prog) return {iso:prog, src:"prog"};
-  return {iso:"", src:null};
+/* ---------- MDF × MDP ----------
+   O lote tem DUAS datas de corte na Programação, e não uma: o MDF é cortado antes porque vai
+   pra pintura. Então cada peça tem que ser cobrada contra a data do material dela — comparar
+   peça de MDF com a data do MDP (ou o contrário) dá atraso/adiantamento falso.
+   O material vem na descrição da peça ("... 670X430X15 MDP 2 BRANCO"). */
+const MATS=["MDF","MDP"];
+function materialDe(desc){ const s=String(desc||"").toUpperCase();
+  if(/\bMDF\b/.test(s)) return "MDF"; if(/\bMDP\b/.test(s)) return "MDP"; return ""; }
+function materialDaOrdem(ordem){ const p=PECA_MAP[ordem]; return p? materialDe(p.desc) : ""; }
+
+// meta efetiva de um lote, POR MATERIAL: manual (digitada) tem prioridade sobre a da Programação.
+// Sem material, devolve a data mais tarde entre as duas (o lote só fecha quando as duas saem).
+function getMeta(lote, mat){
+  if(mat){
+    const manual = localStorage.getItem(LS_PRAZO+lote+":"+mat);
+    if(manual) return {iso:manual, src:"manual", mat};
+    const k=loteKeyNorm(lote); const prog = k? PROG_MAP[k] : null;
+    const iso = prog ? (prog[mat.toLowerCase()]||"") : "";
+    return iso? {iso, src:"prog", mat} : {iso:"", src:null, mat};
+  }
+  const ms=MATS.map(m=>getMeta(lote,m)).filter(x=>x.iso);
+  if(!ms.length) return {iso:"", src:null};
+  ms.sort((a,b)=>a.iso<b.iso?1:-1);                    // a mais tarde manda no lote inteiro
+  return {iso:ms[0].iso, src:ms[0].src, mat:ms[0].mat};
+}
+// materiais que este lote realmente tem (pelas peças) — vazio se o relatório por Produto não veio
+function materiaisDoLote(lote){
+  const set=new Set();
+  for(const r of (AGG?AGG.recs:[])){ if(r.lote!==lote) continue; const m=materialDaOrdem(r.ordem); if(m) set.add(m); }
+  return MATS.filter(m=>set.has(m));
 }
 
 /* ---------- parse workbook ---------- */
@@ -600,22 +664,44 @@ function parseWorkbook(wb){
 }
 
 /* ---------- parse Programação (datas-meta na coluna B) ---------- */
+/* ---------- parse Programação: DUAS datas de corte por lote (MDF e MDP) ----------
+   Coluna C = nº do lote. As datas ficam em A e B — por padrão A = MDF (corta antes, vai pra
+   pintura) e B = MDP. Antes de usar esse padrão o parser procura no cabeçalho da planilha uma
+   célula com "MDF"/"MDP" e mapeia pela posição real, pra não depender da ordem das colunas. */
+function colunasProg(rows){
+  for(const r of rows.slice(0,15)){
+    if(!r) continue;
+    let mdf=-1, mdp=-1;
+    for(let i=0;i<Math.min(r.length,6);i++){
+      const s=String(r[i]||"").toUpperCase();
+      if(mdf<0 && /\bMDF\b/.test(s)) mdf=i;
+      if(mdp<0 && /\bMDP\b/.test(s)) mdp=i;
+    }
+    if(mdf>=0 && mdp>=0 && mdf!==mdp) return {mdf, mdp, src:"cabeçalho"};
+  }
+  return {mdf:0, mdp:1, src:"padrão A=MDF, B=MDP"};      // fallback confirmado com o PCP
+}
 function parseProgramacao(wb){
-  const map={}; let n=0;
+  const map={}; let n=0, comMdf=0, comMdp=0, src="";
   for(const name of wb.SheetNames){
     if(name==="Claude Log"||name==="PLANEJAMENTO MESTRE") continue;
     const ws=wb.Sheets[name]; if(!ws) continue;
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const col=colunasProg(rows); src=col.src;
     for(const r of rows){
       const c=r&&r[2];                                   // coluna C = Nº LOTE
       if(c==null) continue;
       if(!/^\s*\d+\s*\/\s*\d+\s*$/.test(String(c))) continue;  // só "NNN/YY"
       const k=loteKeyNorm(c); if(!k) continue;
-      const iso=cellToISO(r[1]);                          // coluna B = data prevista (CORTE MDP UNI 1)
-      if(iso){ map[k]=iso; n++; }
+      const mdf=cellToISO(r[col.mdf]), mdp=cellToISO(r[col.mdp]);
+      if(!mdf && !mdp) continue;
+      const e=map[k]||(map[k]={mdf:"",mdp:""});
+      if(mdf){ e.mdf=mdf; comMdf++; }
+      if(mdp){ e.mdp=mdp; comMdp++; }
+      n++;
     }
   }
-  return {map,n};
+  return {map,n,comMdf,comMdp,src,colDe:src};
 }
 
 /* ---------- parse "Rel Planilhamento por Produto" (peça = PRODUTO; chave = nº da ORDEM) ----------
@@ -767,11 +853,31 @@ function ordenaPecas(list, qtdeDe){
 }
 let OP_FILTER="";   // "" = todos; senão = código do operador selecionado na matriz
 
-function statusFor(lote){
-  const meta = getMeta(lote);
+// datas de corte de um lote — todas, ou só as do material pedido (MDF/MDP)
+function datasDoLote(lote, mat){
+  if(!mat) return [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
+  const ds=[];
+  for(const r of AGG.recs){
+    if(r.lote!==lote || materialDaOrdem(r.ordem)!==mat) continue;
+    const d=brToDate(r.data); if(d) ds.push(d);
+  }
+  return ds.sort((a,b)=>a-b);
+}
+
+// Status de um lote. Sem material: o lote herda o material em pior situação (o MDF tem data
+// própria e corta antes, então cobrar o lote inteiro contra uma data só dá atraso falso).
+function statusFor(lote, mat){
+  if(!mat){
+    const ms=materiaisDoLote(lote);
+    if(ms.length){
+      const sts=ms.map(m=>statusFor(lote,m)).filter(s=>s.iso);
+      if(sts.length){ sts.sort((a,b)=>(b.desvio??-1e9)-(a.desvio??-1e9)); return sts[0]; }
+    }
+  }
+  const meta = getMeta(lote, mat);
   const iso = meta.iso;
   const prazo = isoToDate(iso);
-  const dias = [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
+  const dias = datasDoLote(lote, mat);
   const last = dias.length? dias[dias.length-1] : null;
   const first = dias.length? dias[0] : null;
   // desvio = último corte − data programada, em dias. Negativo = cortou ANTES da meta.
@@ -792,7 +898,7 @@ function statusFor(lote){
       cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia":" dias");
     }
   }
-  return {iso,prazo,first,last,cls,txt,delta,desvio,src:meta.src};
+  return {iso,prazo,first,last,cls,txt,delta,desvio,src:meta.src,mat:mat||meta.mat||""};
 }
 
 // Em quantos dias o lote foi cortado, quanto saiu em cada um, e quantos dias ele ficou PARADO no meio.
@@ -816,29 +922,38 @@ function diasDoLote(lote){
 
 function renderPrazo(){
   const t=document.getElementById("tbl-prazo");
-  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1º corte</th><th>Último corte</th><th class='l'>Dias de corte</th><th class='l'>Data programada</th><th class='l'>Prazo</th><th class='l'>Status</th></tr></thead><tbody>";
+  let h="<thead><tr><th class='l'>Lote</th><th>Cortado</th><th>1º corte</th><th>Último corte</th><th class='l'>Dias de corte</th>"+
+        "<th class='l'>Prevista MDF <small>(pintura)</small></th><th class='l'>Prevista MDP</th><th class='l'>Status por material</th></tr></thead><tbody>";
   for(const lote of AGG.lotes){
     const s=statusFor(lote);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     const D=diasDoLote(lote);
+    const temMat=materiaisDoLote(lote);
     h+=`<tr>
       <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
       <td class='l dias-cell'><span class='badge ${D.cls}'>${esc(D.txt)}</span>${D.dist.length>1?`<div class='dias-list'>${D.dist.map(x=>`${esc(x.data.slice(0,5))} <b>${fmt(x.qtde)}</b>`).join(" · ")}</div>`:""}</td>
-      <td class='l'><input type='date' data-lote='${esc(lote)}' value='${s.iso}'><span class='print-date'>${s.iso?dateToBR(s.prazo):"—"}</span>${s.src==="prog"?"<span class='src-prog' title='Data vinda da Programação (coluna B)'>PROG</span>":""}</td>
-      <td class='l' style='color:var(--txt2)'>${s.delta||"—"}</td>
-      <td class='l'><span class='badge ${s.cls}'>${s.txt}</span></td>
+      ${MATS.map(m=>{ const g=getMeta(lote,m); const pz=isoToDate(g.iso);
+        return `<td class='l'><input type='date' data-lote='${esc(lote)}' data-mat='${m}' value='${g.iso}'>
+          <span class='print-date'>${g.iso?dateToBR(pz):"—"}</span>
+          ${g.src==="prog"?`<span class='src-prog' title='Data vinda da Programação'>PROG</span>`:""}</td>`; }).join("")}
+      <td class='l'>${
+        temMat.length
+          ? temMat.map(m=>{ const sm=statusFor(lote,m);
+              return `<div class='st-mat'><span class='mat-tag mat-${m}'>${m}</span><span class='badge ${sm.cls}'>${esc(sm.delta||sm.txt)}</span></div>`; }).join("")
+          : `<span class='badge ${s.cls}'>${esc(s.delta||s.txt)}</span><div class='st-nota'>sem o relatório por Produto não dá pra separar MDF de MDP</div>`
+      }</td>
     </tr>`;
   }
   h+="</tbody>";
   t.innerHTML=h;
   t.querySelectorAll("input[type=date]").forEach(inp=>{
     inp.addEventListener("change",e=>{
-      const lote=e.target.dataset.lote, v=e.target.value;
-      if(v) localStorage.setItem(LS_PRAZO+lote,v); else localStorage.removeItem(LS_PRAZO+lote);
-      renderPrazo(); renderKpis(); renderPeca(); renderPecaData();
+      const chave=LS_PRAZO+e.target.dataset.lote+":"+e.target.dataset.mat, v=e.target.value;
+      if(v) localStorage.setItem(chave,v); else localStorage.removeItem(chave);
+      renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
     });
   });
 }
@@ -851,11 +966,15 @@ function renderMatriz(){
   h+="<th>Total dia</th></tr>";
   // 2ª linha do cabeçalho: quando cada lote DEVERIA estar cortado (Programação ou data digitada).
   // Fica logo embaixo do LT pra dar pra comparar com os dias em que ele realmente saiu.
-  h+="<tr class='trprog'><th class='l'>Programada</th>";
+  h+="<tr class='trprog'><th class='l'>Prevista MDF / MDP</th>";
   for(const l of M.lotes){
-    const g=getMeta(l), st=statusFor(l);
-    const cor = st.desvio===null||st.desvio===undefined ? "" : (st.desvio>0?" dv-red":" dv-ok");
-    h+=`<th class='${g.iso?"prog-on"+cor:"prog-off"}' title='${esc(l)}${st.delta?" — "+esc(st.delta):""}'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</th>`;
+    const linhas=MATS.map(m=>{
+      const g=getMeta(l,m); if(!g.iso) return "";
+      const sm=statusFor(l,m);
+      const cor = sm.desvio===null||sm.desvio===undefined ? "" : (sm.desvio>0?" dv-red":" dv-ok");
+      return `<div class='prog-lin${cor}'><span class='mat-tag mat-${m}'>${m}</span>${dateToBR(isoToDate(g.iso))}</div>`;
+    }).filter(Boolean).join("");
+    h+=`<th class='${linhas?"prog-on":"prog-off"}' title='${esc(l)}'>${linhas||"—"}</th>`;
   }
   h+="<th></th></tr></thead><tbody>";
   const temPecas=Object.keys(PECA_MAP).length>0;
@@ -863,8 +982,8 @@ function renderMatriz(){
     h+=`<tr><td class='l num'>${d}</td>`;
     for(const l of M.lotes){
       const v=M.mat[d+"|"+l]||0;
-      const meta=getMeta(l).iso;                         // marca a célula do dia em que era a meta
-      const alvo = meta && isoToDate(meta) && dateToBR(isoToDate(meta))===d ? " cel-meta" : "";
+      // marca a célula do dia que era a meta (de qualquer um dos dois materiais)
+      const alvo = MATS.some(m=>{ const iso=getMeta(l,m).iso; return iso && dateToBR(isoToDate(iso))===d; }) ? " cel-meta" : "";
       // com o relatório por Produto carregado, a quantidade abre a lista de peças daquele dia/lote
       const clic = (v && temPecas);
       const attrs = clic ? ` data-d="${esc(d)}" data-l="${esc(l)}" title="Clique para ver quais peças saíram"` : "";
@@ -993,16 +1112,45 @@ function pecasDoDiaLote(data, lote){
   return ordenaPecas(Object.values(D.pecas).filter(p=>p.lote===lote), p=>p.cortado);
 }
 
+// Uma linha da ficha: traz a data PREVISTA do material da peça e a REALIZADA (último corte dela).
+function fichaLinha(p, lote){
+  const mat=materialDe(p.desc);
+  const g=getMeta(lote, mat||undefined), pz=isoToDate(g.iso);
+  const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+  const f=saldoDe(p);
+  const sobra=(p.planejado||0)>0 && p.cortado>p.planejado ? p.cortado-p.planejado : 0;
+  const dv=(pz&&ult)?daysBetween(ult,pz):null;
+  const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
+  return `<tr class='${f?"falta":""}'>
+    <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
+    <td>${g.iso?dateToBR(pz):"—"}</td>
+    <td class='fx-real'>${ult?dateToBR(ult):"—"}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
+    <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
+    <td>${f?fmt(f):(sobra?`<span class='fx-sobra'>+${fmt(sobra)}</span>`:"—")}</td>
+    <td class='ok-box'></td></tr>`;
+}
+
 function fichaDeLote(lote){
   const pecas=pecasDoLote(lote, true);
-  const st=statusFor(lote), g=getMeta(lote), D=diasDoLote(lote);
+  const st=statusFor(lote), D=diasDoLote(lote);
   const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
   const totC=pecas.reduce((s,p)=>s+p.cortado,0);
   const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
   const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
   const nFalta=pecas.filter(p=>saldoDe(p)>0).length;
-  const progBR=g.iso?dateToBR(isoToDate(g.iso)):"— (sem data programada)";
   const semPeca=pecas.some(p=>p.cod==="—");
+  // MDF primeiro: ele corta antes porque vai pra pintura — é a ordem em que a máquina precisa ler
+  const grupos=MATS.map(m=>({mat:m, lista:pecas.filter(p=>materialDe(p.desc)===m)}))
+                   .concat([{mat:"", lista:pecas.filter(p=>!materialDe(p.desc))}])
+                   .filter(g=>g.lista.length);
+  const cards=MATS.map(m=>{
+    const g=getMeta(lote,m); const sm=statusFor(lote,m);
+    const n=pecas.filter(p=>materialDe(p.desc)===m).length;
+    if(!n && !g.iso) return "";
+    return `<div class='fx-card'><div class='l'>Prevista ${m}${m==="MDF"?" (pintura)":""}</div>
+      <div class='v'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</div>
+      <div class='l'>${n} peça(s)${sm.delta?" · "+esc(sm.delta):""}</div></div>`;
+  }).join("");
   return `<div class='fx-pg'>
     <div class='fx-cab'>
       <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
@@ -1010,29 +1158,38 @@ function fichaDeLote(lote){
       <div class='fx-sub'>${esc(desc||"—")} · Corte · Patrimar Móveis · Jaci/SP</div></div>
     </div>
     <div class='fx-box'>
-      <div class='fx-card'><div class='l'>Data programada</div><div class='v'>${esc(progBR)}</div></div>
+      ${cards}
       <div class='fx-card'><div class='l'>Planejado</div><div class='v'>${totP?fmt(totP):"—"}</div></div>
       <div class='fx-card'><div class='l'>Já cortado</div><div class='v'>${fmt(totC)}</div></div>
-      <div class='fx-card ${totF?"fx-alerta":""}'><div class='l'>Falta cortar</div><div class='v'>${totF?fmt(totF):"0"}</div></div>
-      <div class='fx-card'><div class='l'>Peças</div><div class='v'>${pecas.length}${nFalta?` <small>(${nFalta} c/ falta)</small>`:""}</div></div>
+      <div class='fx-card ${totF?"fx-alerta":""}'><div class='l'>Falta cortar</div><div class='v'>${totF?fmt(totF):"0"}</div>
+        <div class='l'>${pecas.length} peça(s)${nFalta?` · ${nFalta} c/ falta`:""}</div></div>
     </div>
     <div class='fx-linha'>
       Status: <b>${esc(st.txt)}${st.delta?" · "+esc(st.delta):""}</b> ·
       Dias de corte: <b>${D.txt}</b>${D.dist.length?` — ${D.dist.map(x=>esc(x.data)+" "+fmt(x.qtde)).join(" · ")}`:""}
     </div>
-    <table><thead><tr>
-      <th class='l'>Peça (código)</th><th class='l'>Descrição</th>
-      <th>Planejado</th><th>Cortado</th><th>Falta</th><th class='l'>OK</th>
-    </tr></thead><tbody>
-    ${pecas.map(p=>{ const f=saldoDe(p); return `<tr class='${f?"falta":""}'>
-      <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
-      <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
-      <td>${f?fmt(f):"—"}</td><td class='ok-box'></td></tr>`; }).join("")}
-    <tr><td class='l' colspan='2'><b>Total</b></td><td><b>${totP?fmt(totP):"—"}</b></td>
-      <td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"0"}</b></td><td class='ok-box'></td></tr>
-    </tbody></table>
+    ${grupos.map(gr=>{
+      const g=gr.mat?getMeta(lote,gr.mat):{iso:""};
+      const sC=gr.lista.reduce((s,p)=>s+p.cortado,0), sP=gr.lista.reduce((s,p)=>s+(p.planejado||0),0), sF=gr.lista.reduce((s,p)=>s+saldoDe(p),0);
+      return `<div class='fx-grp'>${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}
+        ${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</div>
+      <table><colgroup>
+        <col style='width:86px'><col><col style='width:68px'><col style='width:112px'>
+        <col style='width:68px'><col style='width:64px'><col style='width:58px'><col style='width:54px'>
+      </colgroup><thead><tr>
+        <th class='l'>Peça (código)</th><th class='l'>Descrição</th>
+        <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Cortado</th><th>Falta</th><th class='c'>OK</th>
+      </tr></thead><tbody>
+      ${gr.lista.map(p=>fichaLinha(p,lote)).join("")}
+      <tr class='fx-sub'><td class='l' colspan='4'><b>Subtotal ${esc(gr.mat||"—")}</b></td><td><b>${sP?fmt(sP):"—"}</b></td>
+        <td><b>${fmt(sC)}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
+      </tbody></table>`;
+    }).join("")}
+    <div class='fx-linha'><b>Total do lote:</b> planejado ${totP?fmt(totP):"—"} · cortado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}</div>
     <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
     <div class='fx-nota'>
+      “Prevista” é a data de corte do material da peça na Programação (MDF e MDP têm datas diferentes: o MDF corta antes porque vai pra pintura).
+      “Realizada” é o último corte daquela peça, e ao lado o desvio em dias (− antes da prevista, + depois).
       Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM.
       A lista traz as peças deste lote que aparecem nesses relatórios — peça que não estiver neles não entra aqui.
       ${semPeca?"<b>Atenção: há corte neste lote cujas ordens não estão no relatório por Produto carregado — a linha “sem peça” representa esse volume.</b>":""}
@@ -1084,7 +1241,9 @@ function renderPeca(){
     anyShown=true; nPecas+=pecas.length; mostrados.push(lote);
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
-    const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—"; const st=statusFor(lote);
+    const st=statusFor(lote);
+    // a data mostrada é a do material que determinou o status (MDF e MDP têm datas diferentes)
+    const g=getMeta(lote, st.mat||undefined); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—";
     const ultBR=st.last?dateToBR(st.last):"—";
     const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
     const ic={"b-red":"🔴","b-warn":"🟡","b-ok":"🟢","b-mute":"⚪"}[st.cls]||"⚪";
@@ -1099,7 +1258,7 @@ function renderPeca(){
       <td class='num'>${fmt(totC)}</td>
       <td class='num ${totP?"":"zero"}'>${totP?fmt(totP):"·"}</td>
       <td class='num'>${pctL}</td>
-      <td class='num'>${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
+      <td class='num'>${st.mat?`<span class='mat-tag mat-${st.mat}'>${st.mat}</span>`:""}${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
       <td class='num'>${ultBR}${desvioTag(st)}</td>
       <td class='l'><span class='badge ${st.cls}'>${ic} ${esc(pill)}</span></td>
       <td class='l'><button class='linkbtn fx-btn' data-ficha='${esc(lote)}' title='Ficha deste lote pra levar na máquina'>🖶 ficha</button></td>
@@ -1108,14 +1267,17 @@ function renderPeca(){
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
       const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
-      // desvio da PEÇA: o último corte dela contra a data programada do lote
-      const dv=(st.prazo&&ult)?daysBetween(ult,st.prazo):null;
+      // cada peça é cobrada contra a data do SEU material (MDF corta antes, vai pra pintura)
+      const mat=materialDe(p.desc);
+      const gm=getMeta(lote, mat||undefined);
+      const pzm=isoToDate(gm.iso);
+      const dv=(pzm&&ult)?daysBetween(ult,pzm):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
-        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+        <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
-        <td class='num zero'>${progBR}</td>
+        <td class='num zero'>${gm.iso?dateToBR(pzm):"—"}</td>
         <td class='num'>${ult?dateToBR(ult):"—"}${desvioTag({desvio:dv})}</td>
         <td></td>
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
@@ -1350,14 +1512,16 @@ function applyProg(prog, file){
   for(let i=localStorage.length-1;i>=0;i--){
     const key=localStorage.key(i);
     if(key && key.indexOf(LS_PRAZO)===0){
-      const k=loteKeyNorm(key.slice(LS_PRAZO.length));
-      if(k && prog.map[k]) localStorage.removeItem(key);   // deixa a data da Programação valer
+      const m=key.slice(LS_PRAZO.length).match(/^(.*):(MDF|MDP)$/);
+      if(!m) continue;
+      const k=loteKeyNorm(m[1]), mat=m[2].toLowerCase();
+      if(k && prog.map[k] && prog.map[k][mat]) localStorage.removeItem(key);   // a Programação manda
     }
   }
   if(AGG){
-    renderPrazo(); renderKpis(); renderPeca(); renderPecaData();
+    renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
-    setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.n} datas · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
+    setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.comMdf} datas de MDF + ${prog.comMdp} de MDP (colunas pelo ${prog.src}) · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
   } else {
     showErr(`Guardei ${prog.n} datas da Programação. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — os prazos preenchem sozinhos.`);
   }
@@ -1427,16 +1591,17 @@ function exportCsv(){
   if(!AGG) return;
   const rows=[];
   rows.push(["Data", ...AGG.lotes, "Total dia"]);
-  rows.push(["Programada", ...AGG.lotes.map(l=>{ const g=getMeta(l); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
+  for(const m of MATS) rows.push(["Prevista "+m, ...AGG.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
   for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), AGG.dataT[d]]); }
   rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.grand]);
   rows.push([]);
-  rows.push(["Lote","Cortado","1º corte","Último corte","Dias de corte","Dias parado no meio","Cortado em cada dia","Data programada","Prazo","Status"]);
+  rows.push(["Lote","Cortado","1º corte","Último corte","Dias de corte","Dias parado no meio","Cortado em cada dia","Prevista MDF","Prevista MDP","Prazo","Status"]);
   for(const l of AGG.lotes){
     const s=statusFor(l), D=diasDoLote(l);
+    const dts=MATS.map(m=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; });
     rows.push([l, AGG.loteT[l], dateToBR(s.first), dateToBR(s.last), D.n, D.parados,
                D.dist.map(x=>x.data+": "+x.qtde).join(" | "),
-               s.iso?dateToBR(s.prazo):"", s.delta, s.txt]);
+               ...dts, s.delta, s.txt]);
   }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
@@ -1478,7 +1643,7 @@ function exportPorOperador(){
     if(titulo){ aoa.push([titulo]); aoa.push([]); }
     aoa.push(["Data", ...M.lotes, "Total dia"]);
     // linha com a data prevista de cada lote (Programação/coluna B ou data manual), embaixo da coluna do lote
-    aoa.push(["Data prevista", ...M.lotes.map(l=>{ const g=getMeta(l); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
+    for(const m of MATS) aoa.push(["Prevista "+m, ...M.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), ""]);
     for(const d of M.datas) aoa.push([d, ...M.lotes.map(l=>M.mat[d+"|"+l]||0), M.dataT[d]]);
     aoa.push(["Total cortado", ...M.lotes.map(l=>M.loteT[l]), M.grand]);
     const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -1517,11 +1682,18 @@ function exportPorOperador(){
       const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
       const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
       ck.push([lote, desc]);
-      ck.push(["Data programada", g.iso?dateToBR(isoToDate(g.iso)):"—", "Status", st.txt+(st.delta?" · "+st.delta:""), "Dias de corte", D.txt]);
+      ck.push(["Prevista MDF", (getMeta(lote,"MDF").iso?dateToBR(isoToDate(getMeta(lote,"MDF").iso)):"—"),
+               "Prevista MDP", (getMeta(lote,"MDP").iso?dateToBR(isoToDate(getMeta(lote,"MDP").iso)):"—"),
+               "Status", st.txt+(st.delta?" · "+st.delta:""), "Dias de corte", D.txt]);
       ck.push(["Planejado", totP, "Cortado", totC, "Falta", totF]);
-      ck.push(["Peça (código)","Descrição","Planejado","Cortado","Falta","OK"]);
-      for(const p of pecas) ck.push([p.cod, p.desc, p.planejado||0, p.cortado, saldoDe(p), ""]);
-      ck.push(["","Total", totP, totC, totF, ""]);
+      ck.push(["Peça (código)","Descrição","Material","Prevista","Realizada","Planejado","Cortado","Falta","OK"]);
+      for(const p of pecas){
+        const mat=materialDe(p.desc), gm=getMeta(lote, mat||undefined);
+        const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+        ck.push([p.cod, p.desc, mat||"—", gm.iso?dateToBR(isoToDate(gm.iso)):"—", ult?dateToBR(ult):"—",
+                 p.planejado||0, p.cortado, saldoDe(p), ""]);
+      }
+      ck.push(["","Total","","","", totP, totC, totF, ""]);
       ck.push([]);
     }
     if(ck.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ck), "Checklist por lote");

@@ -38,11 +38,18 @@ arrasta o arquivo na tela e o painel monta na hora:
   data realizada** (último corte) e diz o desvio em dias: 🟢 **Adiantado** (cortou antes da meta),
   🟢 **No dia**, 🔴 **Atrasado**, 🟡 **Em andamento** (ainda não cortou e a meta não venceu).
   Um lote cortado adiantado é marcado como adiantado mesmo que a meta ainda esteja no futuro.
+- **MDF e MDP têm datas diferentes** — o lote tem **duas** datas de corte na Programação, porque o
+  **MDF corta antes: ele vai pra pintura**. O painel lê as duas (colunas A e B), descobre o material
+  de cada peça pela descrição (`... 670X430X15 MDP 2 BRANCO`) e **cobra cada peça contra a data do
+  material dela**. O status do lote herda o material em pior situação, e a tabela de prazo mostra os
+  dois selos. Comparar peça de MDF com a data do MDP dava atraso/adiantamento falso.
 - **Ficha de corte (o papel que vai pra máquina)** — botão **🖶 ficha** em cada lote, ou
-  **Fichas de corte (PDF)** pra gerar todas de uma vez. Uma folha A4 por lote com: data programada,
+  **Fichas de corte (PDF)** pra gerar todas de uma vez. Uma folha A4 por lote, **separada em MDF e
+  MDP — o MDF primeiro, que é a ordem em que a máquina precisa ler** — com: as duas datas previstas,
   planejado × cortado × **falta**, status, os dias em que o lote saiu, e a tabela de peças
-  (código, descrição, planejado, cortado, falta) com uma **caixa pro operador marcar** e rodapé de
-  assinatura/turno. As peças **ainda não cortadas** entram na ficha — são exatamente as que o
+  (código, descrição, **prevista**, **realizada** com o desvio em dias, planejado, cortado, falta)
+  com uma **caixa pro operador marcar** e rodapé de assinatura/turno. Quando o cortado passa do
+  planejado, a coluna Falta mostra o excedente (`+240`) em vez de esconder atrás de um traço. As peças **ainda não cortadas** entram na ficha — são exatamente as que o
   operador precisa ver. O rodapé diz de onde vieram os dados e avisa se houve corte cuja ordem não
   está no relatório por Produto.
 - **Clique numa quantidade da matriz** — abre quais peças saíram naquele dia naquele lote, com
@@ -92,3 +99,17 @@ do relatório por Produto, o painel sabe **peça + lote + data + quantidade** de
 que a seção **“Peças cortadas em cada dia”** mostra. Os totais por dia batem, peça por peça, com a
 linha “Total dia” da matriz por lote. O relatório do sistema às vezes gruda o rótulo
 `Total de horas:` na coluna da máquina; nesses casos o painel usa o **código** da máquina (`SEC01`).
+
+### Programação: duas datas por lote (MDF e MDP)
+Na planilha da Programação, a coluna **C** é o nº do lote e as **duas primeiras colunas são as datas
+de corte**: **A = MDF** e **B = MDP**. São duas porque o **MDF corta antes — ele vai pra pintura**.
+Antes de usar essa ordem, o parser procura no cabeçalho da planilha uma célula com `MDF`/`MDP` e
+mapeia pela posição real; só cai no padrão `A=MDF, B=MDP` se não achar. A mensagem ao carregar diz
+qual dos dois caminhos foi usado (`colunas pelo cabeçalho` ou `pelo padrão A=MDF, B=MDP`) — confira
+ali antes de confiar nos prazos.
+
+O material de cada peça sai da **descrição** (`... 670X430X15 MDP 2 BRANCO`), e é assim que cada peça
+é cobrada contra a data certa. Peça sem `MDF`/`MDP` na descrição (perfil, papelão) fica sem material
+e cai na data mais tarde do lote. Datas digitadas na mão também são **por material** — a tabela de
+prazo tem um campo pra cada. Dados salvos no formato antigo (uma data só) migram sozinhos para MDP,
+que era a coluna que o painel lia antes.
