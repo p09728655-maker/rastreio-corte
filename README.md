@@ -17,6 +17,11 @@ arrasta o arquivo na tela e o painel monta na hora:
   **matriz data × peça** (uma coluna por dia, agrupada por lote). Usa os mesmos dois relatórios
   da seção Peças. A ordem das peças é **por lote e código** (padrão) ou **maior quantidade** —
   o seletor vale para as duas seções de peça e para os arquivos exportados.
+  Como um dia de fábrica tem centenas de peças, as duas seções de peça **abrem recolhidas**:
+  aparece só o **resumo** (o dia com total e lotes; o lote com nº de peças e o corte de cada dia)
+  e você abre o que quiser. Tem **filtro de dia** e botão **Expandir/Recolher tudo**. Recolhida,
+  a matriz vira um **Lote × Data** compacto. As linhas de peça só são montadas quando o grupo abre,
+  então a tela continua leve mesmo com o mês inteiro carregado — e o PDF sai com o que estiver aberto.
 - **Dias de corte (o lote saiu de uma vez ou foi picado?)** — na tabela **Prazo por lote**, uma
   coluna diz em **quantos dias** cada lote foi cortado e **quanto saiu em cada dia**. Quando o lote
   ficou **parado no meio** — teve dia em que a fábrica cortou outras coisas e ele não andou — o

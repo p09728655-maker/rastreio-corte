@@ -239,8 +239,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #tbl-pecadata .pd-dia,#tbl-pecadata .pd-lote,#tbl-pecadata .peca-cod{color:#111 !important;font-weight:700}
   #tbl-pecadata .pd-sem,#tbl-pecadata .pd-meta,#tbl-pecadata .pd-lotelist,#tbl-pecadata .pd-prog{color:#555 !important}
   #tbl-pecadata td:first-child{max-width:none;position:static !important;box-shadow:none !important}
-  /* impresso: mostra tudo, mesmo o que estiver recolhido na tela */
-  #tbl-pecadata .pd-item{display:table-row !important}
+  /* imprime o que está aberto na tela — o que estiver recolhido nem existe na tabela */
   .kpis{display:flex;gap:6px;margin-bottom:12px}
   .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
@@ -339,7 +338,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
             <option value="qtde">Maior quantidade</option>
           </select>
         </label>
-        <span id="peca-info" class="prog-info">Clique num lote para recolher/expandir.</span>
+        <button class="linkbtn" id="peca-toggle" style="margin:0">Expandir tudo</button>
+        <span id="peca-info" class="prog-info">Clique num lote para abrir as peças.</span>
       </div>
       <div class="tbl-wrap" id="peca-wrap" style="display:none"><table id="tbl-peca"></table></div>
     </section>
@@ -370,12 +370,16 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
             <option value="matriz">Matriz data × peça</option>
           </select>
         </label>
+        <label class="prog-info ord-lbl">Dia:
+          <select id="pd-dia"><option value="">Todos</option></select>
+        </label>
         <label class="prog-info ord-lbl">Ordenar:
           <select class="ord-sel" data-ord="1">
             <option value="lote">Lote e peça (código)</option>
             <option value="qtde">Maior quantidade</option>
           </select>
         </label>
+        <button class="linkbtn" id="pd-toggle" style="margin:0">Expandir tudo</button>
         <span id="pd-info" class="prog-info"></span>
       </div>
       <div class="tbl-wrap" id="pd-wrap" style="display:none"><table id="tbl-pecadata"></table></div>
@@ -648,6 +652,12 @@ let AGG=null;
 // Ordem das peças nas listas. Padrão: por LOTE e depois por CÓDIGO da peça — é como a fábrica lê
 // (o mesmo produto sempre no mesmo lugar). A outra opção põe a maior quantidade primeiro.
 let PECA_ORD="lote";
+
+// Quais grupos estão ABERTOS. Tudo começa recolhido: numa semana cheia são centenas de peças por
+// dia, e a tela viraria uma parede de linhas. As linhas de peça só são montadas quando o grupo
+// abre — assim a tabela fica leve mesmo com muito lote. Chaves: "lote:LT 129/26" / "dia:23/07/26".
+const ABERTOS=new Set();
+function toggleAberto(k){ if(ABERTOS.has(k)) ABERTOS.delete(k); else ABERTOS.add(k); }
 function ordenaPecas(list, qtdeDe){
   const porCod=(a,b)=>String(a.cod||"").localeCompare(String(b.cod||""),"pt-BR",{numeric:true});
   if(PECA_ORD==="qtde") return list.sort((a,b)=> qtdeDe(b)-qtdeDe(a) || porCod(a,b));
@@ -812,13 +822,13 @@ function renderPeca(){
   const lotes=Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b));
   const t=document.getElementById("tbl-peca");
   let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th>Planejado</th><th>%</th><th>Último corte</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
-  let anyShown=false;
+  let anyShown=false, nPecas=0; const mostrados=[];
   for(const lote of lotes){
     let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
     if(q) pecas=pecas.filter(p=>(p.cod+" "+p.desc).toLowerCase().includes(q));
     if(!pecas.length) continue;
     ordenaPecas(pecas, p=>p.cortado);
-    anyShown=true;
+    anyShown=true; nPecas+=pecas.length; mostrados.push(lote);
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—"; const st=statusFor(lote);
@@ -826,7 +836,8 @@ function renderPeca(){
     const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
     const ic={"b-red":"🔴","b-warn":"🟡","b-ok":"🟢","b-mute":"⚪"}[st.cls]||"⚪";
     const pill=st.delta||st.txt;
-    h+=`<tr class='peca-lote ${stKey}' data-lote='${esc(lote)}'>
+    const aberto = q ? true : ABERTOS.has("lote:"+lote);   // com busca, abre quem tem resultado
+    h+=`<tr class='peca-lote ${stKey}${aberto?"":" collapsed"}' data-lote='${esc(lote)}'>
       <td class='l' colspan='7'><div class='pl-row'>
         <div class='pl-left'>
           <span class='pl-lote'>${esc(lote)}</span>
@@ -838,6 +849,7 @@ function renderPeca(){
           <span class='badge ${st.cls}'>${ic} ${esc(pill)}</span>
         </div>
       </div></td></tr>`;
+    if(!aberto) continue;                                  // recolhido: nem monta as linhas
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
       const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
@@ -854,15 +866,17 @@ function renderPeca(){
   h+="</tbody>";
   if(!anyShown) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
-  // recolher/expandir por lote (as peça-rows vêm logo após o cabeçalho do lote)
+  // clicar no lote abre/fecha — re-renderiza pra montar (ou jogar fora) as linhas de peça
   t.querySelectorAll(".peca-lote").forEach(hr=>{
-    hr.addEventListener("click",()=>{
-      hr.classList.toggle("collapsed");
-      const col=hr.classList.contains("collapsed");
-      let el=hr.nextElementSibling;
-      while(el && el.classList.contains("peca-row") && el.dataset.lote===hr.dataset.lote){ el.style.display=col?"none":""; el=el.nextElementSibling; }
-    });
+    hr.addEventListener("click",()=>{ toggleAberto("lote:"+hr.dataset.lote); renderPeca(); });
   });
+  const bt=document.getElementById("peca-toggle");
+  if(bt){ const tudoAberto=mostrados.length && mostrados.every(l=>ABERTOS.has("lote:"+l));
+    bt.textContent = tudoAberto ? "Recolher tudo" : "Expandir tudo";
+    bt.dataset.abrir = tudoAberto ? "0" : "1"; bt.dataset.chaves = mostrados.map(l=>"lote:"+l).join("|"); }
+  const inf=document.getElementById("peca-info");
+  if(inf){ const abertos=mostrados.filter(l=>ABERTOS.has("lote:"+l)).length;
+    inf.textContent = mostrados.length ? `${mostrados.length} lote(s) · ${fmt(nPecas)} linha(s) de peça` + (abertos?` · ${abertos} aberto(s)`:" · clique num lote para abrir") : ""; }
 }
 
 /* ---------- "Peças cortadas em cada dia": o rastreio da data mostrando a peça ---------- */
@@ -882,29 +896,35 @@ function renderPecaData(){
   if(!hasPeca || !AGG){ empty.style.display="block"; bar.style.display="none"; wrap.style.display="none"; return; }
   empty.style.display="none"; bar.style.display="flex"; wrap.style.display="";
 
+  // o filtro de dia acompanha os dias do arquivo (mantendo o que estiver escolhido)
+  const selDia=document.getElementById("pd-dia");
+  const opts="<option value=''>Todos</option>"+AGG.datas.map(d=>`<option value='${esc(d)}'>${esc(d)}</option>`).join("");
+  if(selDia.dataset.dias!==AGG.datas.join(",")){ const v=selDia.value; selDia.innerHTML=opts; selDia.value=v; selDia.dataset.dias=AGG.datas.join(","); }
+
   const q=(document.getElementById("pd-search").value||"").trim().toLowerCase();
+  const dia=document.getElementById("pd-dia").value||"";
   const match=p=>!q || (p.cod+" "+p.desc+" "+p.lote).toLowerCase().includes(q);
   t.className = PD_MODE==="matriz" ? "mx" : "";
 
-  if(PD_MODE==="dia") renderPdDia(t, info, q, match);
-  else                renderPdMatriz(t, info, q, match);
+  const chaves = PD_MODE==="dia" ? renderPdDia(t, info, q, match, dia)
+                                 : renderPdMatriz(t, info, q, match, dia);
 
-  // recolher/expandir: as linhas do grupo vêm logo depois do cabeçalho, com o mesmo data-grp
+  // clicar no cabeçalho abre/fecha — re-renderiza pra montar (ou jogar fora) as linhas de peça
   t.querySelectorAll(".pd-grp").forEach(hr=>{
-    hr.addEventListener("click",()=>{
-      hr.classList.toggle("collapsed");
-      const col=hr.classList.contains("collapsed");
-      let el=hr.nextElementSibling;
-      while(el && el.classList.contains("pd-item") && el.dataset.grp===hr.dataset.grp){ el.style.display=col?"none":""; el=el.nextElementSibling; }
-    });
+    hr.addEventListener("click",()=>{ toggleAberto(hr.dataset.grp); renderPecaData(); });
   });
+  const bt=document.getElementById("pd-toggle");
+  if(bt){ const tudoAberto=chaves.length && chaves.every(k=>ABERTOS.has(k));
+    bt.textContent = tudoAberto ? "Recolher tudo" : "Expandir tudo";
+    bt.dataset.abrir = tudoAberto ? "0" : "1"; bt.dataset.chaves = chaves.join("|"); }
 }
 
 // Lista por dia: um bloco por data, e dentro dele as peças que saíram naquele dia.
-function renderPdDia(t, info, q, match){
-  const dias=buildPecaDia();
+function renderPdDia(t, info, q, match, dia){
+  const dias=buildPecaDia().filter(D=>!dia || D.data===dia);
+  const chaves=[];
   let h="<thead><tr><th class='l'>Peça cortada no dia</th><th class='l'>Lote</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
-  let nDias=0, nLinhas=0, totPc=0;
+  let nDias=0, nLinhas=0, totPc=0, nAbertos=0;
   for(const D of dias){
     let pecas=Object.values(D.pecas).filter(match);
     if(!pecas.length) continue;
@@ -912,15 +932,19 @@ function renderPdDia(t, info, q, match){
     const tot=pecas.reduce((s,p)=>s+p.cortado,0);
     const lotes=[...new Set(pecas.map(p=>p.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
     nDias++; nLinhas+=pecas.length; totPc+=tot;
-    h+=`<tr class='pd-grp st-mute' data-grp='${esc(D.data)}'>
+    const chave="dia:"+D.data; chaves.push(chave);
+    const aberto = q ? true : ABERTOS.has(chave);      // com busca, abre quem tem resultado
+    if(aberto) nAbertos++;
+    h+=`<tr class='pd-grp st-mute${aberto?"":" collapsed"}' data-grp='${esc(chave)}'>
       <td class='l' colspan='5'><div class='pd-row'>
         <span class='pd-dia'>${esc(D.data)}</span>
         <span class='pd-sem'>${esc(diaSemana(D.data))}</span>
         <span class='pd-meta'>${pecas.length} peça(s) diferente(s) · <b>${fmt(tot)}</b> pç cortadas</span>
         <span class='pd-lotelist'>${lotes.length} lote(s): ${esc(lotes.join(", "))}</span>
       </div></td></tr>`;
+    if(!aberto) continue;                              // recolhido: nem monta as linhas
     for(const p of pecas){
-      h+=`<tr class='pd-item' data-grp='${esc(D.data)}'>
+      h+=`<tr class='pd-item' data-grp='${esc(chave)}'>
         <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
         <td class='l'><span class='lote-name'>${esc(p.lote)}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
@@ -931,36 +955,45 @@ function renderPdDia(t, info, q, match){
   h+="</tbody>";
   if(!nDias) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
-  if(info) info.textContent=nDias?`${nDias} dia(s) · ${nLinhas} linha(s) · ${fmt(totPc)} pç. Clique no dia para recolher.`:"";
+  if(info) info.textContent = nDias
+    ? `${nDias} dia(s) · ${fmt(nLinhas)} linha(s) de peça · ${fmt(totPc)} pç` + (nAbertos?` · ${nAbertos} dia(s) aberto(s)`:" · clique num dia para abrir")
+    : "";
+  return chaves;
 }
 
 // Matriz data × peça: uma coluna por dia, agrupada por lote (com a faixa de status do lote).
-function renderPdMatriz(t, info, q, match){
+// Recolhida, ela é a matriz Data × Lote. Abrindo um lote, ela abre nas peças daquele lote.
+function renderPdMatriz(t, info, q, match, dia){
   const M=buildPecaMatriz();
   const rows=M.rows.filter(match);
   // só as datas que sobraram depois do filtro, pra tabela não ficar com colunas vazias
-  const datas=M.datas.filter(d=>rows.some(r=>r.byData[d]));
+  const datas=M.datas.filter(d=>(!dia || d===dia) && rows.some(r=>r.byData[d]));
+  const chaves=[];
   let h="<thead><tr><th class='l'>Peça</th>";
   for(const d of datas) h+=`<th>${esc(d)}</th>`;
   h+="<th>Total</th></tr></thead><tbody>";
   const lotes=[...new Set(rows.map(r=>r.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
   const colTot={};
+  let nPecas=0;
   for(const lote of lotes){
     const doLote=ordenaPecas(rows.filter(r=>r.lote===lote), r=>r.tot);
+    let totLote=0; const porData={};
+    for(const d of datas){ const v=doLote.reduce((s,r)=>s+(r.byData[d]||0),0); porData[d]=v; totLote+=v; }
+    if(!totLote) continue;                              // lote fora do dia filtrado
+    for(const d of datas) colTot[d]=(colTot[d]||0)+porData[d];
+    nPecas+=doLote.length;
     const st=statusFor(lote);
     const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
     const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"—";
-    h+=`<tr class='pd-grp ${stKey}' data-grp='${esc(lote)}'>
-      <td class='l'><span class='pd-lote'>${esc(lote)}</span><span class='pd-prog'>prog. ${esc(progBR)}</span></td>`;
-    let totLote=0;
-    for(const d of datas){
-      const v=doLote.reduce((s,r)=>s+(r.byData[d]||0),0);
-      totLote+=v; colTot[d]=(colTot[d]||0)+v;
-      h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`;
-    }
+    const chave="lotemx:"+lote; chaves.push(chave);
+    const aberto = q ? true : ABERTOS.has(chave);
+    h+=`<tr class='pd-grp ${stKey}${aberto?"":" collapsed"}' data-grp='${esc(chave)}'>
+      <td class='l'><span class='pd-lote'>${esc(lote)}</span><span class='pd-prog'>${doLote.length} peça(s) · prog. ${esc(progBR)}</span></td>`;
+    for(const d of datas){ const v=porData[d]; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
     h+=`<td class='num'>${fmt(totLote)}</td></tr>`;
+    if(!aberto) continue;                               // recolhido: fica só a linha do lote
     for(const r of doLote){
-      h+=`<tr class='pd-item' data-grp='${esc(lote)}'>
+      h+=`<tr class='pd-item' data-grp='${esc(chave)}'>
         <td class='l'><span class='mono peca-cod'>${esc(r.cod)}</span> ${esc(r.desc)}</td>`;
       for(const d of datas){ const v=r.byData[d]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
       h+=`<td class='num'>${fmt(r.tot)}</td></tr>`;
@@ -970,9 +1003,10 @@ function renderPdMatriz(t, info, q, match){
   h+="<tr class='trtot'><td class='l'>Total do dia</td>";
   for(const d of datas) h+=`<td>${fmt(colTot[d]||0)}</td>`;
   h+=`<td>${fmt(grand)}</td></tr></tbody>`;
-  if(!rows.length) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
+  if(!chaves.length) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
-  if(info) info.textContent=rows.length?`${rows.length} peça(s) × ${datas.length} dia(s) · ${fmt(grand)} pç. Clique no lote para recolher.`:"";
+  if(info) info.textContent=chaves.length?`${chaves.length} lote(s) × ${datas.length} dia(s) · ${fmt(nPecas)} peça(s) · ${fmt(grand)} pç · clique num lote para abrir as peças`:"";
+  return chaves;
 }
 
 function renderKpis(){
@@ -1263,6 +1297,19 @@ document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) re
 /* "Peças cortadas em cada dia": busca + modo (lista por dia × matriz data × peça) */
 document.getElementById("pd-search").addEventListener("input",()=>{ if(AGG) renderPecaData(); });
 document.getElementById("pd-mode").addEventListener("change",e=>{ PD_MODE=e.target.value; if(AGG) renderPecaData(); });
+document.getElementById("pd-dia").addEventListener("change",()=>{ if(AGG) renderPecaData(); });
+
+/* "Expandir tudo" / "Recolher tudo" — o botão guarda as chaves dos grupos que estão na tela */
+function ligaToggle(id, redesenha){
+  document.getElementById(id).addEventListener("click",e=>{
+    const chaves=(e.target.dataset.chaves||"").split("|").filter(Boolean);
+    if(e.target.dataset.abrir==="1") chaves.forEach(k=>ABERTOS.add(k));
+    else                             chaves.forEach(k=>ABERTOS.delete(k));
+    if(AGG) redesenha();
+  });
+}
+ligaToggle("peca-toggle", renderPeca);
+ligaToggle("pd-toggle", renderPecaData);
 
 /* ordenação das peças: os dois seletores (seção Peças e seção Dias) mexem no mesmo ajuste */
 document.querySelectorAll(".ord-sel").forEach(sel=>{
