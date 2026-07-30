@@ -314,9 +314,11 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-peca">
       <h2>Peças cortadas por lote <span class="tag">o que saiu de cada lote</span></h2>
-      <div class="sec-sub">Cruza o corte com o relatório <b>“Rel Planilhamento por Produto”</b> (pelo nº da <b>ORDEM</b>) e mostra <b>qual peça foi cortada</b> em cada lote — quanto saiu × o planejado. Carregue os dois relatórios do <b>mesmo período</b>.</div>
+      <div class="sec-sub">Cruza o corte com o relatório <b>“Rel Planilhamento por Produto”</b> (pelo nº da <b>ORDEM</b>) e mostra <b>qual peça foi cortada</b> em cada lote — quanto saiu × o planejado. Carregue os dois relatórios do <b>mesmo período</b>.
+        Se o Corte pega vários dias e o Produto só um, <b>carregue um relatório por Produto de cada período</b> — eles vão se somando.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
+        <button class="linkbtn" id="btn-prod-limpar" style="margin:0">Limpar peças carregadas</button>
         <span id="prod-info" class="prog-info"></span>
         <input type="file" id="file-prod" accept=".xlsx,.xls" class="hidden">
       </div>
@@ -383,7 +385,10 @@ let PROG_MAP = {};
 try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG_MAP={}; }
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
 let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
-let PROD_PERIOD = "";   // "Período de:" do relatório por Produto — p/ avisar se forem períodos diferentes
+let PROD_PERIOD = "";   // "Período de:" do último relatório por Produto — p/ avisar se forem períodos diferentes
+// Dá pra carregar VÁRIOS relatórios por Produto (um por período): os mapas ordem->peça vão se somando.
+// É o que resolve o caso "o Corte é de 23/07 a 30/07 mas o Produto exportado é só de um dia".
+let PROD_FILES = [];    // [{nome, period, n, novos}] — só p/ mostrar o que já foi carregado
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
@@ -563,7 +568,7 @@ function buildPecaLote(){
     const p = PECA_MAP[r.ordem] || null;
     const L = byLote[r.lote] || (byLote[r.lote]={pecas:{}, totCort:0});
     const cod  = p ? p.cod  : "—";
-    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const desc = p ? p.desc : "(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
     const P = L.pecas[cod] || (L.pecas[cod]={cod, desc, cortado:0, planejado:0, datas:new Set(), maqs:new Set(), ops:new Set()});
     P.cortado += r.qtde;
     if(p && !ordVista.has(r.ordem)){ P.planejado += (p.qtdeOrdem||0); ordVista.add(r.ordem); } // planejado 1x por ordem
@@ -585,7 +590,7 @@ function buildPecaDia(){
     if(!(r.qtde>0)) continue;
     const p    = PECA_MAP[r.ordem] || null;
     const cod  = p ? p.cod  : "—";
-    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const desc = p ? p.desc : "(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
     const D = byDia[r.data] || (byDia[r.data]={data:r.data, tot:0, lotes:new Set(), pecas:{}});
     const k = r.lote+"␟"+cod;                 // mesma peça em lotes diferentes = linhas diferentes
     const P = D.pecas[k] || (D.pecas[k]={cod, desc, lote:r.lote, cortado:0, maqs:new Set(), ops:new Set()});
@@ -604,7 +609,7 @@ function buildPecaMatriz(){
     if(!(r.qtde>0)) continue;
     const p    = PECA_MAP[r.ordem] || null;
     const cod  = p ? p.cod  : "—";
-    const desc = p ? p.desc : "(peça não identificada no relatório por Produto)";
+    const desc = p ? p.desc : "(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
     const k = r.lote+"␟"+cod;
     const row = rows[k] || (rows[k]={lote:r.lote, cod, desc, tot:0, byData:{}});
     row.byData[r.data]=(row.byData[r.data]||0)+r.qtde;
@@ -712,14 +717,34 @@ function renderFunc(){
 // normaliza "Período de:" p/ comparar (espaços/caixa)
 function normPeriod(s){ return String(s||"").replace(/\s+/g," ").trim().toLowerCase(); }
 // avisos quando os dois relatórios parecem de períodos/escopos diferentes
+// Quais DIAS do corte ficaram sem peça — é o que denuncia "faltou carregar o Produto desse período".
+function diasSemPeca(){
+  const semSet=new Set(), comSet=new Set();
+  let cob=0, tot=0, qtdeSem=0;
+  for(const r of (AGG?AGG.recs:[])){
+    if(!(r.qtde>0)) continue;
+    tot++;
+    if(PECA_MAP[r.ordem]){ cob++; comSet.add(r.data); }
+    else { semSet.add(r.data); qtdeSem+=r.qtde; }
+  }
+  const dias=[...semSet].sort((a,b)=>brToDate(a)-brToDate(b));
+  return {dias, cob, tot, qtdeSem, temCom:comSet.size>0};
+}
+
 function pecaAlertMsg(){
   if(!Object.keys(PECA_MAP).length || !AGG) return "";
   const msgs=[];
+  const {dias, cob, tot, qtdeSem} = diasSemPeca();
+  if(dias.length){
+    // o caso comum: o Corte pega a semana inteira e o Produto foi exportado de um dia só
+    const lista = dias.length<=6 ? dias.join(", ") : (dias[0]+" a "+dias[dias.length-1]+" ("+dias.length+" dias)");
+    msgs.push(`${fmt(qtdeSem)} pç sem peça identificada — as ordens cortadas em <b>${esc(lista)}</b> não estão em nenhum relatório por Produto carregado.
+      Exporte o <b>“Rel Planilhamento por Produto”</b> cobrindo esses dias e carregue também: <b>dá pra carregar vários</b>, os relatórios vão se somando.`);
+  }
   const nf=normPeriod(FUNC_PERIOD), np=normPeriod(PROD_PERIOD);
-  if(nf && np && nf!==np) msgs.push(`Períodos diferentes — Corte: “${esc(FUNC_PERIOD)}” × Produto: “${esc(PROD_PERIOD)}”. Confira se os dois relatórios são do mesmo período.`);
-  let cob=0, tot=0;
-  for(const r of AGG.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
-  if(tot && cob/tot<0.8) msgs.push(`Só ${cob}/${tot} operações cortadas casaram com uma peça (${Math.round(cob/tot*100)}%). Pode ser relatório de período ou escopo diferente.`);
+  if(!dias.length && PROD_FILES.length===1 && nf && np && nf!==np)
+    msgs.push(`Períodos diferentes — Corte: “${esc(FUNC_PERIOD)}” × Produto: “${esc(PROD_PERIOD)}”. Confira se os dois relatórios são do mesmo período.`);
+  if(tot && cob/tot<0.8 && !dias.length) msgs.push(`Só ${cob}/${tot} operações cortadas casaram com uma peça (${Math.round(cob/tot*100)}%). Pode ser relatório de escopo diferente.`);
   return msgs.join(" ");
 }
 
@@ -1008,18 +1033,28 @@ function handleProg(file){
 
 /* ---------- relatório "por Produto" (peças) ---------- */
 function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); if(!e) return; e.textContent=msg; e.style.color=warn?"var(--warn)":"var(--ok)"; }
-// guarda o mapa ordem->peça e re-renderiza. Se o Corte ainda não veio, avisa.
+// Soma o mapa ordem->peça ao que já tem e re-renderiza. Se o Corte ainda não veio, avisa.
+// SOMA (não substitui): assim dá pra carregar um relatório por Produto de cada período
+// e cobrir toda a janela do relatório de Corte.
 function applyPeca(prod, file){
-  PECA_MAP = prod.map;
+  let novos=0;
+  for(const ordem in prod.map){ if(!(ordem in PECA_MAP)) novos++; PECA_MAP[ordem]=prod.map[ordem]; }
   PROD_PERIOD = prod.period || "";
+  PROD_FILES.push({nome:file?file.name:"(arquivo)", period:prod.period||"", n:prod.n, novos});
   if(AGG){
     renderKpis(); renderPeca(); renderPecaData();
-    let cob=0, tot=0;
-    for(const r of AGG.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
-    setProdInfo(`✓ Produto${file?" ("+file.name+")":""}: ${prod.n} peças · ${cob}/${tot} operações cortadas com peça identificada.`, false);
+    const {cob,tot} = diasSemPeca();
+    const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
+    setProdInfo(`✓ ${quantos} · ${cob}/${tot} operações cortadas com peça identificada.`, false);
   } else {
     showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — as peças aparecem por lote.`);
   }
+}
+// zera as peças carregadas (pra recomeçar com outro conjunto de relatórios por Produto)
+function limparPecas(){
+  PECA_MAP={}; PROD_FILES=[]; PROD_PERIOD="";
+  setProdInfo("Peças carregadas limpas.", false);
+  if(AGG){ renderKpis(); renderPeca(); renderPecaData(); }
 }
 function handleProduto(file){
   const rdr=new FileReader();
@@ -1162,6 +1197,7 @@ document.getElementById("btn-limpar").addEventListener("click",limparManuais);
 /* botão / arquivo do relatório por Produto (peças) + busca */
 const fileProd=document.getElementById("file-prod");
 document.getElementById("btn-prod").addEventListener("click",()=>fileProd.click());
+document.getElementById("btn-prod-limpar").addEventListener("click",limparPecas);
 fileProd.addEventListener("change",e=>{ if(e.target.files[0]) handleProduto(e.target.files[0]); fileProd.value=""; });
 document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) renderPeca(); });
 
