@@ -238,11 +238,63 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 .print-only{display:none}
 .print-date{display:none}
 
+/* ---- detalhe da célula da matriz (quais peças saíram naquele dia, naquele lote) ---- */
+/* a célula com valor mostra que dá pra clicar — sem isso ninguém descobre sozinho */
+#tbl-matriz td.tem-peca{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;text-decoration-color:var(--txt3)}
+#tbl-matriz td.tem-peca:hover{color:var(--acc);text-decoration-color:var(--acc)}
+#modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px}
+#modal-fundo{position:absolute;inset:0;background:rgba(0,0,0,.72)}
+#modal-cx{position:relative;background:var(--surface);border:.5px solid var(--border);border-radius:10px;
+  max-width:900px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+#modal-cab{display:flex;align-items:flex-start;gap:16px;padding:16px 18px;border-bottom:.5px solid var(--border);
+  flex-wrap:nowrap}
+#modal-cab>div:first-child{min-width:0}
+#modal-cab .modal-acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:nowrap;align-items:center;flex-shrink:0}
+#modal-tit{font-family:var(--font-h);font-size:17px;font-weight:700;color:var(--txt)}
+#modal-sub{font-family:var(--font-d);font-size:11px;color:var(--txt2);margin-top:3px;line-height:1.5}
+#modal-corpo{overflow:auto}
+#modal-corpo table{font-size:12.5px}
+#modal-corpo th{position:sticky;top:0}
+#modal-corpo td{white-space:normal}          /* operador/máquina quebram em vez de cortar */
+#modal-corpo td:first-child{min-width:280px}
+
+/* ---- ficha de corte (só existe no papel) ---- */
+#ficha{display:none}
+.fx-pg{page-break-after:always;break-after:page}
+.fx-pg:last-child{page-break-after:auto;break-after:auto}
+
 /* ================= IMPRESSÃO / PDF ================= */
 @media print{
   @page{ size:A4 landscape; margin:11mm; }
   html,body{background:#fff !important;color:#111 !important}
-  header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn{display:none !important}
+  header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn,#modal{display:none !important}
+  /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
+  body.modo-ficha main,body.modo-ficha header,body.modo-ficha footer{display:none !important}
+  body.modo-ficha #ficha{display:block !important}
+  @page{ size:A4 portrait; margin:12mm }
+  .fx-cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:10px}
+  .fx-cab .fx-logo{height:30px}
+  .fx-cab .fx-tit{font-family:var(--font-h);font-weight:700;font-size:20px;color:#111}
+  .fx-cab .fx-tit span{color:#FF5C1F}
+  .fx-cab .fx-sub{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+  .fx-box{display:flex;gap:8px;margin-bottom:10px}
+  .fx-card{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
+  .fx-card .l{font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#666}
+  .fx-card .v{font-family:var(--font-d);font-size:17px;font-weight:700;color:#111}
+  .fx-alerta{border:1.5px solid #c62828;color:#c62828;font-weight:700}
+  .fx-linha{font-family:var(--font-d);font-size:9.5px;color:#333;margin-bottom:8px;line-height:1.6}
+  .fx-linha b{color:#111}
+  #ficha table{width:100%;border-collapse:collapse;font-size:10px}
+  #ficha th{background:#eee !important;color:#111 !important;border:1px solid #bbb;padding:4px 6px;
+    font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
+  #ficha th.l,#ficha td.l{text-align:left}
+  #ficha td{border:1px solid #ccc;padding:4px 6px;text-align:right;color:#111}
+  #ficha tr.falta td{background:#fdecea !important;font-weight:700}
+  #ficha td.ok-box{width:58px;background:#fff}   /* espaço pro operador marcar de caneta */
+  #ficha .fx-rod{margin-top:14px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
+  #ficha .fx-rod div{flex:1;border-top:1px solid #111;padding-top:3px}
+  #ficha .fx-nota{margin-top:10px;font-size:8.5px;color:#666;line-height:1.5;font-family:var(--font-d)}
   main{max-width:100% !important;padding:0 !important}
   .print-only{display:block}
   #print-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:12px}
@@ -347,7 +399,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-peca">
       <h2>Peças cortadas por lote <span class="tag">o que saiu de cada lote</span></h2>
       <div class="sec-sub">Cruza o corte com o relatório <b>“Rel Planilhamento por Produto”</b> (pelo nº da <b>ORDEM</b>) e mostra <b>qual peça foi cortada</b> em cada lote — quanto saiu × o planejado. Carregue os dois relatórios do <b>mesmo período</b>.
-        Se o Corte pega vários dias e o Produto só um, <b>carregue um relatório por Produto de cada período</b> — eles vão se somando.</div>
+        Se o Corte pega vários dias e o Produto só um, <b>carregue um relatório por Produto de cada período</b> — eles vão se somando.
+        <b>🖶 Ficha de corte</b>: gera uma folha por lote pra levar na máquina, com a lista de peças, <b>o que ainda falta cortar</b> e espaço pro operador marcar e assinar.
+        A ficha inclui as peças <b>ainda não cortadas</b> (que não aparecem na tabela abaixo).</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
         <button class="linkbtn" id="btn-prod-limpar" style="margin:0">Limpar peças carregadas</button>
@@ -365,6 +419,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
           </select>
         </label>
         <button class="linkbtn" id="peca-toggle" style="margin:0">Expandir tudo</button>
+        <button class="linkbtn" id="btn-fichas" style="margin:0" title="Uma folha por lote, com a lista de peças e o que falta cortar — pra levar na máquina">🖶 Fichas de corte (PDF)</button>
         <span id="peca-info" class="prog-info">Clique num lote para abrir as peças.</span>
       </div>
       <div class="tbl-wrap" id="peca-wrap" style="display:none"><table id="tbl-peca"></table></div>
@@ -372,7 +427,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-matriz">
       <h2>Cortado por lote &amp; data <span class="tag">matriz data × lote</span></h2>
-      <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.</div>
+      <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.
+        Com o relatório por Produto carregado, <b>clique numa quantidade</b> para ver <b>quais peças</b> saíram naquele dia naquele lote
+        (e a quantos dias da data programada aquilo foi cortado).</div>
       <div class="prazo-actions">
         <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Operador:
           <select id="op-filter"><option value="">Todos</option></select>
@@ -423,6 +480,25 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     </div>
   </div>
 </main>
+
+<!-- Ficha de corte: o papel que vai pra máquina. Fica vazio até você mandar gerar;
+     na impressão, o corpo ganha .modo-ficha e só ela aparece. -->
+<div id="ficha" class="hidden"></div>
+
+<!-- Detalhe de uma célula da matriz (dia × lote): quais peças saíram ali -->
+<div id="modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="modal-tit">
+  <div id="modal-fundo"></div>
+  <div id="modal-cx">
+    <div id="modal-cab">
+      <div><div id="modal-tit"></div><div id="modal-sub"></div></div>
+      <div class="modal-acoes">
+        <button class="linkbtn" id="modal-ficha">Gerar ficha deste lote</button>
+        <button class="linkbtn" id="modal-fechar">Fechar ✕</button>
+      </div>
+    </div>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
 
 <footer>Rastreio do Corte · Patrimar Móveis · processado localmente no navegador</footer>
 
@@ -782,13 +858,17 @@ function renderMatriz(){
     h+=`<th class='${g.iso?"prog-on"+cor:"prog-off"}' title='${esc(l)}${st.delta?" — "+esc(st.delta):""}'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</th>`;
   }
   h+="<th></th></tr></thead><tbody>";
+  const temPecas=Object.keys(PECA_MAP).length>0;
   for(const d of M.datas){
     h+=`<tr><td class='l num'>${d}</td>`;
     for(const l of M.lotes){
       const v=M.mat[d+"|"+l]||0;
       const meta=getMeta(l).iso;                         // marca a célula do dia em que era a meta
       const alvo = meta && isoToDate(meta) && dateToBR(isoToDate(meta))===d ? " cel-meta" : "";
-      h+=`<td class='num ${v?"":"zero"}${alvo}'>${v?fmt(v):"·"}</td>`;
+      // com o relatório por Produto carregado, a quantidade abre a lista de peças daquele dia/lote
+      const clic = (v && temPecas);
+      const attrs = clic ? ` data-d="${esc(d)}" data-l="${esc(l)}" title="Clique para ver quais peças saíram"` : "";
+      h+=`<td class="num ${v?"":"zero"}${alvo}${clic?" tem-peca":""}"${attrs}>${v?fmt(v):"·"}</td>`;
     }
     h+=`<td class='num'>${fmt(M.dataT[d])}</td></tr>`;
   }
@@ -800,6 +880,37 @@ function renderMatriz(){
   const h1=t.querySelector("thead tr").offsetHeight;
   t.querySelectorAll("thead .trprog th").forEach(th=>{ th.style.top=h1+"px"; });
 }
+
+/* ---------- clique numa quantidade da matriz: quais peças saíram ali ---------- */
+let MODAL_LOTE="";
+function abrirDetalhe(data, lote){
+  const pecas=pecasDoDiaLote(data, lote);
+  const tot=pecas.reduce((s,p)=>s+p.cortado,0);
+  const g=getMeta(lote), prazo=g.iso?isoToDate(g.iso):null;
+  MODAL_LOTE=lote;
+  document.getElementById("modal-tit").textContent=`${lote} · ${data}`;
+  // situa o dia em relação à meta — é o que explica um corte solto fora da janela do lote
+  let sub=`${fmt(tot)} pç · ${pecas.length} peça(s) diferente(s)`;
+  if(prazo){
+    const d=daysBetween(brToDate(data), prazo);
+    sub += ` · data programada do lote ${dateToBR(prazo)}` +
+      (d===0? " — cortado no dia" : d<0? ` — ${-d} dia(s) ANTES da programada` : ` — ${d} dia(s) depois da programada`);
+  } else sub += " · lote sem data programada";
+  document.getElementById("modal-sub").textContent=sub;
+
+  let h=`<table><thead><tr><th class='l'>Peça</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
+  if(!pecas.length) h+=`<tr><td class='l' colspan='4' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
+  for(const p of pecas){
+    h+=`<tr><td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+      <td class='num'>${fmt(p.cortado)}</td>
+      <td class='l'>${esc([...p.maqs].join(", "))}</td>
+      <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
+  }
+  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
+  document.getElementById("modal-corpo").innerHTML=h;
+  document.getElementById("modal").classList.remove("hidden");
+}
+function fecharModal(){ document.getElementById("modal").classList.add("hidden"); }
 
 // preenche o seletor de operador (código) da matriz
 function renderOpFilter(){
@@ -862,6 +973,84 @@ function pecaAlertMsg(){
   return msgs.join(" ");
 }
 
+/* ---------- Ficha de corte: o papel que vai pra máquina ----------
+   Lista TODAS as peças que o relatório conhece do lote — inclusive as que ainda não foram
+   cortadas (QTDE PROD. = 0) — com planejado, cortado e o que FALTA, mais uma caixinha pro
+   operador marcar. É o que tira a desculpa de "não sabia quais peças eram". */
+function pecasDoLote(lote, incluirNaoCortadas){
+  const L=buildPecaLote()[lote];
+  if(!L) return [];
+  let lista=Object.values(L.pecas);
+  if(!incluirNaoCortadas) lista=lista.filter(p=>p.cortado>0);
+  return ordenaPecas(lista, p=>p.cortado);
+}
+function saldoDe(p){ return Math.max(0, (p.planejado||0)-(p.cortado||0)); }
+
+// Quais peças saíram num dia específico, dentro de um lote (usado no clique da matriz).
+function pecasDoDiaLote(data, lote){
+  const D=buildPecaDia().find(x=>x.data===data);
+  if(!D) return [];
+  return ordenaPecas(Object.values(D.pecas).filter(p=>p.lote===lote), p=>p.cortado);
+}
+
+function fichaDeLote(lote){
+  const pecas=pecasDoLote(lote, true);
+  const st=statusFor(lote), g=getMeta(lote), D=diasDoLote(lote);
+  const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+  const totC=pecas.reduce((s,p)=>s+p.cortado,0);
+  const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
+  const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
+  const nFalta=pecas.filter(p=>saldoDe(p)>0).length;
+  const progBR=g.iso?dateToBR(isoToDate(g.iso)):"— (sem data programada)";
+  const semPeca=pecas.some(p=>p.cod==="—");
+  return `<div class='fx-pg'>
+    <div class='fx-cab'>
+      <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
+      <div><div class='fx-tit'>Ficha de corte <span>· ${esc(lote)}</span></div>
+      <div class='fx-sub'>${esc(desc||"—")} · Corte · Patrimar Móveis · Jaci/SP</div></div>
+    </div>
+    <div class='fx-box'>
+      <div class='fx-card'><div class='l'>Data programada</div><div class='v'>${esc(progBR)}</div></div>
+      <div class='fx-card'><div class='l'>Planejado</div><div class='v'>${totP?fmt(totP):"—"}</div></div>
+      <div class='fx-card'><div class='l'>Já cortado</div><div class='v'>${fmt(totC)}</div></div>
+      <div class='fx-card ${totF?"fx-alerta":""}'><div class='l'>Falta cortar</div><div class='v'>${totF?fmt(totF):"0"}</div></div>
+      <div class='fx-card'><div class='l'>Peças</div><div class='v'>${pecas.length}${nFalta?` <small>(${nFalta} c/ falta)</small>`:""}</div></div>
+    </div>
+    <div class='fx-linha'>
+      Status: <b>${esc(st.txt)}${st.delta?" · "+esc(st.delta):""}</b> ·
+      Dias de corte: <b>${D.txt}</b>${D.dist.length?` — ${D.dist.map(x=>esc(x.data)+" "+fmt(x.qtde)).join(" · ")}`:""}
+    </div>
+    <table><thead><tr>
+      <th class='l'>Peça (código)</th><th class='l'>Descrição</th>
+      <th>Planejado</th><th>Cortado</th><th>Falta</th><th class='l'>OK</th>
+    </tr></thead><tbody>
+    ${pecas.map(p=>{ const f=saldoDe(p); return `<tr class='${f?"falta":""}'>
+      <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
+      <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
+      <td>${f?fmt(f):"—"}</td><td class='ok-box'></td></tr>`; }).join("")}
+    <tr><td class='l' colspan='2'><b>Total</b></td><td><b>${totP?fmt(totP):"—"}</b></td>
+      <td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"0"}</b></td><td class='ok-box'></td></tr>
+    </tbody></table>
+    <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
+    <div class='fx-nota'>
+      Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM.
+      A lista traz as peças deste lote que aparecem nesses relatórios — peça que não estiver neles não entra aqui.
+      ${semPeca?"<b>Atenção: há corte neste lote cujas ordens não estão no relatório por Produto carregado — a linha “sem peça” representa esse volume.</b>":""}
+    </div>
+  </div>`;
+}
+
+// Monta as fichas e chama a impressão do navegador (Salvar como PDF).
+function imprimirFichas(lotes){
+  if(!lotes.length) return;
+  document.getElementById("ficha").innerHTML=lotes.map(fichaDeLote).join("");
+  document.body.classList.add("modo-ficha");
+  const limpa=()=>{ document.body.classList.remove("modo-ficha"); window.removeEventListener("afterprint",limpa); };
+  window.addEventListener("afterprint",limpa);
+  window.print();
+  setTimeout(limpa,1500);   // navegador que não dispara afterprint não deixa a tela travada
+}
+
 // Etiqueta do desvio embaixo da data realizada: −3 d = cortou 3 dias ANTES da meta; +5 d = depois.
 function desvioTag(st){
   const d=st&&st.desvio;
@@ -913,7 +1102,8 @@ function renderPeca(){
       <td class='num'>${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
       <td class='num'>${ultBR}${desvioTag(st)}</td>
       <td class='l'><span class='badge ${st.cls}'>${ic} ${esc(pill)}</span></td>
-      <td></td><td></td></tr>`;
+      <td class='l'><button class='linkbtn fx-btn' data-ficha='${esc(lote)}' title='Ficha deste lote pra levar na máquina'>🖶 ficha</button></td>
+      <td></td></tr>`;
     if(!aberto) continue;                                  // recolhido: nem monta as linhas
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
@@ -939,6 +1129,12 @@ function renderPeca(){
   t.querySelectorAll(".peca-lote").forEach(hr=>{
     hr.addEventListener("click",()=>{ toggleAberto("lote:"+hr.dataset.lote); renderPeca(); });
   });
+  t.querySelectorAll(".fx-btn").forEach(bf=>{
+    bf.addEventListener("click",e=>{ e.stopPropagation(); imprimirFichas([bf.dataset.ficha]); });
+  });
+  const bfx=document.getElementById("btn-fichas");
+  if(bfx){ bfx.dataset.lotes=mostrados.join("|");
+    bfx.textContent=`🖶 Fichas de corte (${mostrados.length})`; }
   const bt=document.getElementById("peca-toggle");
   if(bt){ const tudoAberto=mostrados.length && mostrados.every(l=>ABERTOS.has("lote:"+l));
     bt.textContent = tudoAberto ? "Recolher tudo" : "Expandir tudo";
@@ -1309,6 +1505,27 @@ function exportPorOperador(){
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
 
+    // aba de CHECKLIST: um bloco por lote, com o que falta cortar e uma coluna pra marcar.
+    // É a que você imprime e manda pra máquina — inclui as peças ainda não cortadas.
+    const ck=[];
+    for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
+      const pecas=pecasDoLote(lote, true);
+      if(!pecas.length) continue;
+      const st=statusFor(lote), g=getMeta(lote), D=diasDoLote(lote);
+      const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+      const totC=pecas.reduce((s,p)=>s+p.cortado,0);
+      const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
+      const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
+      ck.push([lote, desc]);
+      ck.push(["Data programada", g.iso?dateToBR(isoToDate(g.iso)):"—", "Status", st.txt+(st.delta?" · "+st.delta:""), "Dias de corte", D.txt]);
+      ck.push(["Planejado", totP, "Cortado", totC, "Falta", totF]);
+      ck.push(["Peça (código)","Descrição","Planejado","Cortado","Falta","OK"]);
+      for(const p of pecas) ck.push([p.cod, p.desc, p.planejado||0, p.cortado, saldoDe(p), ""]);
+      ck.push(["","Total", totP, totC, totF, ""]);
+      ck.push([]);
+    }
+    if(ck.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ck), "Checklist por lote");
+
     // aba: o que foi cortado em cada dia, peça a peça (mesma leitura da tela)
     const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]];
     for(const D of buildPecaDia()){
@@ -1380,6 +1597,20 @@ function ligaToggle(id, redesenha){
 }
 ligaToggle("peca-toggle", renderPeca);
 ligaToggle("pd-toggle", renderPecaData);
+
+/* fichas de corte + detalhe da célula da matriz */
+document.getElementById("btn-fichas").addEventListener("click",e=>{
+  const ls=(e.target.dataset.lotes||"").split("|").filter(Boolean);
+  if(ls.length) imprimirFichas(ls);
+});
+document.getElementById("tbl-matriz").addEventListener("click",e=>{
+  const td=e.target.closest("td.tem-peca");
+  if(td) abrirDetalhe(td.dataset.d, td.dataset.l);
+});
+document.getElementById("modal-fechar").addEventListener("click",fecharModal);
+document.getElementById("modal-fundo").addEventListener("click",fecharModal);
+document.getElementById("modal-ficha").addEventListener("click",()=>{ const l=MODAL_LOTE; fecharModal(); imprimirFichas([l]); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharModal(); });
 
 /* ordenação das peças: os dois seletores (seção Peças e seção Dias) mexem no mesmo ajuste */
 document.querySelectorAll(".ord-sel").forEach(sel=>{
