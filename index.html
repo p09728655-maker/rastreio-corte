@@ -621,6 +621,22 @@ function materiaisDoLote(lote){
   return MATS.filter(m=>set.has(m));
 }
 
+/* ================= DEFEITOS CONHECIDOS DO EXPORT DO ERP =================
+   Os .xls que saem do sistema vêm com linhas embaralhadas. Todos os casos abaixo foram vistos
+   em arquivo real e são tratados nos parsers — se aparecer um novo, documente aqui.
+
+   1) "Período de:" mente. Um arquivo com operações de 01/07 a 30/07 veio com o cabeçalho
+      "Período de: 30/07/26 até 30/07/26". O período que vale é o das DATAS das operações
+      (periodoDosDados), e o painel avisa quando os dois discordam.
+   2) O rótulo "Total de horas:" cai na coluna do NOME DA MÁQUINA de uma linha de operação.
+      Tratado em parseWorkbook: nesse caso usa o CÓDIGO da máquina (col 4, "SEC01").
+   3) O cabeçalho "PRODUTO" do próximo bloco gruda numa linha de operação (col 0 = ORDEM e o
+      cabeçalho ocupando as colunas de quantidade/data). Sem tratar, a ordem some do mapa e a
+      peça dela nunca aparece. Tratado em parseProduto: a ordem é do produto vigente e o
+      cabeçalho passa a valer da linha seguinte. No arquivo real eram 2 ordens.
+   4) A linha "Lote" traz um ID interno numérico na coluna B; o texto do lote está na coluna C.
+   ======================================================================== */
+
 /* ---------- parse workbook ---------- */
 function parseWorkbook(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -711,18 +727,27 @@ function parseProgramacao(wb){
 function parseProduto(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  const map={}; let n=0, cur=null, period="";
+  const map={}; let n=0, cur=null, period="", hibridas=0; const datas=new Set();
   for(const row of rows){
     const c = row||[];
     for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
-    if(c[1]==="PRODUTO"){ cur={cod:String(c[2]||"").trim(), desc:String(c[3]||"").trim()}; continue; }
+    if(c[1]==="PRODUTO"){
+      // Linha híbrida: o sistema gruda o cabeçalho do PRÓXIMO produto numa linha de operação
+      // (col 0 = ORDEM, e as colunas de quantidade/data viram o cabeçalho). Sem tratar, essa
+      // ordem some do mapa e a peça dela nunca aparece. A ordem é do produto VIGENTE — o
+      // cabeçalho só passa a valer da linha seguinte.
+      if(typeof c[0]==="number" && cur){ map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:0}; n++; hibridas++; }
+      cur={cod:String(c[2]||"").trim(), desc:String(c[3]||"").trim()};
+      continue;
+    }
     if(c[0]==="ORDEM") continue;                 // cabeçalho de colunas
     if(typeof c[0]==="number"){                  // linha de operação → mapeia ORDEM p/ a peça vigente
       if(cur){ map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:Math.trunc(parseBR(c[1]))}; n++; }
+      if(typeof c[3]==="string" && /\d\d?\/\d\d?\/\d\d/.test(c[3])) datas.add(c[3].trim());
       continue;
     }
   }
-  return {map,n,period};
+  return {map,n,period,hibridas,datas:[...datas].sort((a,b)=>brToDate(a)-brToDate(b))};
 }
 
 /* ---------- aggregate ---------- */
@@ -898,7 +923,16 @@ function statusFor(lote, mat){
       cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia":" dias");
     }
   }
-  return {iso,prazo,first,last,cls,txt,delta,desvio,src:meta.src,mat:mat||meta.mat||""};
+  // A meta é anterior ao começo do arquivo? Então o corte que atendeu o prazo pode ter acontecido
+  // ANTES do período exportado, e o painel não tem como saber. Dizer "42 dias atrasado" nesse caso
+  // é afirmar com dado incompleto — o que aparece aqui costuma ser reposição/complemento do lote.
+  let foraJanela=false;
+  const iniArq = (AGG && AGG.datas.length) ? brToDate(AGG.datas[0]) : null;
+  if(prazo && iniArq && prazo < iniArq){
+    foraJanela=true; cls="b-warn"; txt="Fora da janela";
+    delta=`meta ${dateToBR(prazo)} é anterior ao arquivo (começa ${AGG.datas[0]})`;
+  }
+  return {iso,prazo,first,last,cls,txt,delta,desvio,foraJanela,src:meta.src,mat:mat||meta.mat||""};
 }
 
 // Em quantos dias o lote foi cortado, quanto saiu em cada um, e quantos dias ele ficou PARADO no meio.
@@ -1060,6 +1094,12 @@ function renderFunc(){
 // "Peças cortadas por lote": só cortado>0, agrupado por lote (cabeçalho recolhível) + busca.
 // normaliza "Período de:" p/ comparar (espaços/caixa)
 function normPeriod(s){ return String(s||"").replace(/\s+/g," ").trim().toLowerCase(); }
+// O "Período de:" que o sistema escreve no topo NÃO é confiável — num arquivo com 01/07 a 30/07
+// ele veio escrito "30/07/26 até 30/07/26". O período que vale é o das datas das operações.
+function periodoDosDados(datas){
+  if(!datas || !datas.length) return "";
+  return datas.length===1 ? datas[0] : (datas[0]+" até "+datas[datas.length-1]);
+}
 // avisos quando os dois relatórios parecem de períodos/escopos diferentes
 // Quais DIAS do corte ficaram sem peça — é o que denuncia "faltou carregar o Produto desse período".
 function diasSemPeca(){
@@ -1438,9 +1478,10 @@ function renderPdMatriz(t, info, q, match, dia){
 
 function renderKpis(){
   const k=document.getElementById("kpis");
-  let atrasados=0, semMeta=0, varios=0, picados=0;
+  let atrasados=0, semMeta=0, varios=0, picados=0, fora=0;
   for(const l of AGG.lotes){
     const s=statusFor(l); if(s.cls==="b-red") atrasados++; if(s.cls==="b-mute") semMeta++;
+    if(s.foraJanela) fora++;
     const d=diasDoLote(l); if(d.n>1) varios++; if(d.parados) picados++;
   }
   const cards=[
@@ -1453,6 +1494,8 @@ function renderKpis(){
     {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
     {lbl:"Sem data-meta", val:semMeta, cls:semMeta?"warn":"ok"},
   ];
+  // só aparece se existir: são lotes cujo prazo o painel NÃO consegue julgar com este arquivo
+  if(fora) cards.push({lbl:"Meta antes do arquivo", val:fora, sub:"não dá pra julgar", cls:"warn"});
   if(Object.keys(PECA_MAP).length){
     const set=new Set();
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
@@ -1462,8 +1505,13 @@ function renderKpis(){
 }
 
 function renderAll(period){
-  FUNC_PERIOD = period || "";
-  document.getElementById("fper").textContent = period ? ("Período: "+period) : "";
+  // vale o período das datas do arquivo, não o que o sistema declara no cabeçalho
+  const real = periodoDosDados(AGG.datas);
+  FUNC_PERIOD = real || period || "";
+  const fper=document.getElementById("fper");
+  const declaraOutro = period && real && normPeriod(period)!==normPeriod(real);
+  fper.textContent = real ? `Período: ${real} · ${AGG.datas.length} dia(s)` + (declaraOutro?` (o arquivo declara “${period}”)`:"") : "";
+  fper.title = declaraOutro ? "O “Período de:” do cabeçalho do relatório não bate com as datas das operações — vale o das operações." : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
   renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca(); renderPecaData();
   if(Object.keys(PROG_MAP).length){
@@ -1556,13 +1604,14 @@ function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); i
 function applyPeca(prod, file){
   let novos=0;
   for(const ordem in prod.map){ if(!(ordem in PECA_MAP)) novos++; PECA_MAP[ordem]=prod.map[ordem]; }
-  PROD_PERIOD = prod.period || "";
-  PROD_FILES.push({nome:file?file.name:"(arquivo)", period:prod.period||"", n:prod.n, novos});
+  PROD_PERIOD = periodoDosDados(prod.datas) || prod.period || "";
+  PROD_FILES.push({nome:file?file.name:"(arquivo)", period:PROD_PERIOD, n:prod.n, novos});
   if(AGG){
     renderKpis(); renderPeca(); renderPecaData();
     const {cob,tot} = diasSemPeca();
     const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
-    setProdInfo(`✓ ${quantos} · ${cob}/${tot} operações cortadas com peça identificada.`, false);
+    const per = PROD_PERIOD?` [${PROD_PERIOD}]`:"";
+    setProdInfo(`✓ ${quantos}${per} · ${cob}/${tot} operações cortadas com peça identificada.`, false);
   } else {
     showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — as peças aparecem por lote.`);
   }
