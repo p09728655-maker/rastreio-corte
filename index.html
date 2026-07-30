@@ -128,24 +128,37 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
 /* cabeçalho do lote: faixa colorida por status, pra bater o olho e ver o desvio */
 #tbl-peca .peca-lote{cursor:pointer}
-#tbl-peca .peca-lote td{border-top:2px solid var(--bg);border-bottom:none;padding:11px 14px}
-#tbl-peca .peca-lote.st-red td{background:rgba(244,67,54,.14);border-left:4px solid var(--red)}
-#tbl-peca .peca-lote.st-warn td{background:rgba(255,152,0,.14);border-left:4px solid var(--warn)}
-#tbl-peca .peca-lote.st-ok td{background:rgba(76,175,80,.13);border-left:4px solid var(--ok)}
-#tbl-peca .peca-lote.st-mute td{background:var(--elevated);border-left:4px solid var(--txt3)}
+#tbl-peca .peca-lote td{border-top:2px solid var(--bg);border-bottom:none;padding:11px 14px;font-weight:600}
+#tbl-peca .peca-lote.st-red td{background:rgba(244,67,54,.14)}
+#tbl-peca .peca-lote.st-warn td{background:rgba(255,152,0,.14)}
+#tbl-peca .peca-lote.st-ok td{background:rgba(76,175,80,.13)}
+#tbl-peca .peca-lote.st-mute td{background:var(--elevated)}
+/* a faixa colorida do status fica só na 1ª célula — se ficasse em todas, viraria grade */
+#tbl-peca .peca-lote.st-red  td:first-child{border-left:4px solid var(--red)}
+#tbl-peca .peca-lote.st-warn td:first-child{border-left:4px solid var(--warn)}
+#tbl-peca .peca-lote.st-ok   td:first-child{border-left:4px solid var(--ok)}
+#tbl-peca .peca-lote.st-mute td:first-child{border-left:4px solid var(--txt3)}
 #tbl-peca .peca-lote:hover td{filter:brightness(1.18)}
-#tbl-peca .pl-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-#tbl-peca .pl-left{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:200px}
-#tbl-peca .pl-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-left:auto}
 #tbl-peca .pl-lote{font-family:var(--font-d);font-weight:700;color:var(--acc);font-size:14px}
 #tbl-peca .pl-lote::before{content:"▾ ";color:var(--txt2);font-size:11px}
 #tbl-peca .peca-lote.collapsed .pl-lote::before{content:"▸ "}
-#tbl-peca .pl-desc{color:var(--txt);font-size:12.5px}
-#tbl-peca .pl-meta{font-family:var(--font-d);font-size:9px;letter-spacing:1px;color:var(--txt2);text-transform:uppercase}
-#tbl-peca .pl-dates{font-family:var(--font-d);font-size:12px;color:var(--txt2);white-space:nowrap}
-#tbl-peca .pl-dates b{color:var(--txt);font-size:13px}
-#tbl-peca .pl-dates .pl-sep{color:var(--txt3);margin:0 6px}
+#tbl-peca .pl-desc{color:var(--txt);font-size:12.5px;font-weight:400;margin-left:8px}
+#tbl-peca .pl-meta{font-family:var(--font-d);font-size:9px;letter-spacing:1px;color:var(--txt2);
+  text-transform:uppercase;font-weight:400;margin-left:6px}
 #tbl-peca .peca-lote .badge{font-size:11px;padding:4px 11px}
+/* coluna da peça congelada + largura travada: descrição longa não empurra as colunas de data */
+#tbl-peca td:first-child,#tbl-peca th:first-child{position:sticky;left:0;z-index:1;
+  max-width:420px;overflow:hidden;text-overflow:ellipsis;box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-peca td:first-child{background:var(--surface)}
+#tbl-peca th:first-child{background:var(--elevated);z-index:3}
+#tbl-peca tbody tr:hover td:first-child{background:#191919}
+#tbl-peca .peca-lote.st-red td:first-child{background:#3a1f1e}
+#tbl-peca .peca-lote.st-warn td:first-child{background:#3a2c19}
+#tbl-peca .peca-lote.st-ok td:first-child{background:#1e2f1f}
+#tbl-peca .peca-lote.st-mute td:first-child{background:var(--elevated)}
+/* desvio embaixo da data realizada: cortou antes (−) ou depois (+) da programada */
+.desvio{font-family:var(--font-d);font-size:9.5px;letter-spacing:.5px;margin-top:2px;font-weight:600}
+.dv-ok{color:var(--ok)} .dv-red{color:var(--red)}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
@@ -181,11 +194,10 @@ td.zero{color:var(--txt3)}
 #tbl-pecadata .pd-grp.collapsed .pd-dia::before{content:"▸ "}
 #tbl-pecadata .pd-sem{color:var(--txt2);font-size:11px;font-family:var(--font-d);text-transform:uppercase;
   letter-spacing:1px;margin-left:8px;font-weight:400}
-#tbl-pecadata .pd-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-#tbl-pecadata .pd-meta{font-family:var(--font-d);font-size:11px;color:var(--txt2);
-  font-weight:400;text-transform:none;letter-spacing:0}
-#tbl-pecadata .pd-meta b{color:var(--txt)}
-#tbl-pecadata .pd-lotelist{color:var(--txt2);font-size:11px;font-family:var(--font-d);font-weight:400}
+#tbl-pecadata .pd-meta{font-family:var(--font-d);font-size:10px;color:var(--txt2);
+  font-weight:400;text-transform:uppercase;letter-spacing:1px;margin-left:8px}
+#tbl-pecadata .pd-lotelist{color:var(--txt2);font-size:11px;font-family:var(--font-d);font-weight:400;
+  white-space:normal}
 
 /* Status badges */
 .badge{display:inline-block;font-family:var(--font-d);font-size:10px;font-weight:600;text-transform:uppercase;
@@ -306,7 +318,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
       <div class="sec-sub">Informe a <b>data programada</b> (quando o lote deveria estar cortado) — ou <b>puxe as datas da Programação</b> (coluna B) automaticamente. O painel guarda no navegador e marca o status.
-        <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>. 🟢 "No prazo" significa que não houve corte depois da meta, e não que o lote está concluído.
+        <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>.
+        🟢 <b>Adiantado</b> = o último corte foi <b>antes</b> da meta · 🟢 <b>No dia</b> · 🔴 <b>Atrasado</b> = foi depois ·
+        🟡 <b>Em andamento</b> = ainda não teve corte e a meta não venceu. "Adiantado" quer dizer que não houve corte depois da meta, e não que o lote está concluído.
         A coluna <b>“Dias de corte”</b> mostra se o lote saiu de uma vez ou foi <b>picado em vários dias</b>, com quanto saiu em cada um.
         <b>“parou N”</b> quer dizer que, entre o primeiro e o último corte do lote, teve <b>N dias em que a fábrica cortou outras coisas e esse lote não andou</b> (fim de semana e feriado não contam).</div>
       <div class="prazo-actions">
@@ -672,13 +686,25 @@ function statusFor(lote){
   const dias = [...(AGG.loteDates[lote]||[])].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
   const last = dias.length? dias[dias.length-1] : null;
   const first = dias.length? dias[0] : null;
-  let cls="b-mute", txt="Sem data", delta="";
+  // desvio = último corte − data programada, em dias. Negativo = cortou ANTES da meta.
+  // Compara sempre que existe corte, mesmo com o prazo ainda no futuro — antes disso o lote
+  // cortado adiantado aparecia como "em andamento" só porque a meta ainda não tinha chegado.
+  let cls="b-mute", txt="Sem data", delta="", desvio=null;
   if(prazo){
-    if(last && last>prazo){ cls="b-red"; txt="Atrasado"; const d=daysBetween(last,prazo); delta=d+(d===1?" dia atrasado":" dias atrasado"); }
-    else if(prazo>=todayMidday()){ cls="b-warn"; txt="Em andamento"; const d=daysBetween(prazo,todayMidday()); delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia":" dias")); }
-    else { cls="b-ok"; txt="No prazo"; if(last){ const d=Math.abs(daysBetween(prazo,last)); delta=d===0?"cortado no dia":(d+(d===1?" dia adiantado":" dias adiantado")); } }
+    if(last){
+      desvio=daysBetween(last,prazo);
+      if(desvio>0)       { cls="b-red";  txt="Atrasado";  delta=desvio+(desvio===1?" dia atrasado":" dias atrasado"); }
+      else if(desvio===0){ cls="b-ok";   txt="No dia";    delta="cortado no dia"; }
+      else               { const d=-desvio; cls="b-ok"; txt="Adiantado"; delta=d+(d===1?" dia adiantado":" dias adiantado"); }
+    } else if(prazo>=todayMidday()){
+      const d=daysBetween(prazo,todayMidday());
+      cls="b-warn"; txt="Em andamento"; delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia":" dias"));
+    } else {
+      const d=daysBetween(todayMidday(),prazo);
+      cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia":" dias");
+    }
   }
-  return {iso,prazo,first,last,cls,txt,delta,src:meta.src};
+  return {iso,prazo,first,last,cls,txt,delta,desvio,src:meta.src};
 }
 
 // Em quantos dias o lote foi cortado, quanto saiu em cada um, e quantos dias ele ficou PARADO no meio.
@@ -807,6 +833,15 @@ function pecaAlertMsg(){
   return msgs.join(" ");
 }
 
+// Etiqueta do desvio embaixo da data realizada: −3 d = cortou 3 dias ANTES da meta; +5 d = depois.
+function desvioTag(st){
+  const d=st&&st.desvio;
+  if(d===null||d===undefined) return "";
+  if(d===0) return `<div class='desvio dv-ok' title='cortado no dia programado'>no dia</div>`;
+  return d<0 ? `<div class='desvio dv-ok' title='cortado antes da data programada'>−${-d} d</div>`
+             : `<div class='desvio dv-red' title='cortado depois da data programada'>+${d} d</div>`;
+}
+
 function renderPeca(){
   const hasPeca=Object.keys(PECA_MAP).length>0;
   const empty=document.getElementById("peca-empty");
@@ -821,7 +856,7 @@ function renderPeca(){
   const byLote=buildPecaLote();
   const lotes=Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b));
   const t=document.getElementById("tbl-peca");
-  let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th>Planejado</th><th>%</th><th>Último corte</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
+  let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th>Planejado</th><th>%</th><th>Programada</th><th>Realizada</th><th class='l'>Status</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
   let anyShown=false, nPecas=0; const mostrados=[];
   for(const lote of lotes){
     let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
@@ -836,29 +871,34 @@ function renderPeca(){
     const stKey={"b-red":"st-red","b-warn":"st-warn","b-ok":"st-ok","b-mute":"st-mute"}[st.cls]||"st-mute";
     const ic={"b-red":"🔴","b-warn":"🟡","b-ok":"🟢","b-mute":"⚪"}[st.cls]||"⚪";
     const pill=st.delta||st.txt;
+    const totP=pecas.reduce((s,p)=>s+p.planejado,0);
+    const pctL=totP>0?Math.round(totC/totP*100)+"%":"—";
     const aberto = q ? true : ABERTOS.has("lote:"+lote);   // com busca, abre quem tem resultado
+    // cabeçalho do lote em células REAIS, pra cada número cair embaixo da sua coluna
     h+=`<tr class='peca-lote ${stKey}${aberto?"":" collapsed"}' data-lote='${esc(lote)}'>
-      <td class='l' colspan='7'><div class='pl-row'>
-        <div class='pl-left'>
-          <span class='pl-lote'>${esc(lote)}</span>
-          ${desc?`<span class='pl-desc'>${esc(desc)}</span>`:""}
-          <span class='pl-meta'>${pecas.length} peça(s) · ${fmt(totC)} pç</span>
-        </div>
-        <div class='pl-right'>
-          <span class='pl-dates'>Programada <b>${progBR}</b>${g.src==="prog"?" <span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}<span class='pl-sep'>→</span>Último corte <b>${ultBR}</b></span>
-          <span class='badge ${st.cls}'>${ic} ${esc(pill)}</span>
-        </div>
-      </div></td></tr>`;
+      <td class='l'><span class='pl-lote'>${esc(lote)}</span>${desc?` <span class='pl-desc'>${esc(desc)}</span>`:""}
+        <span class='pl-meta'>${pecas.length} peça(s)</span></td>
+      <td class='num'>${fmt(totC)}</td>
+      <td class='num ${totP?"":"zero"}'>${totP?fmt(totP):"·"}</td>
+      <td class='num'>${pctL}</td>
+      <td class='num'>${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
+      <td class='num'>${ultBR}${desvioTag(st)}</td>
+      <td class='l'><span class='badge ${st.cls}'>${ic} ${esc(pill)}</span></td>
+      <td></td><td></td></tr>`;
     if(!aberto) continue;                                  // recolhido: nem monta as linhas
     for(const p of pecas){
       const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
       const pct=p.planejado>0?Math.round(p.cortado/p.planejado*100)+"%":"—";
+      // desvio da PEÇA: o último corte dela contra a data programada do lote
+      const dv=(st.prazo&&ult)?daysBetween(ult,st.prazo):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
         <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
-        <td class='num'>${ult?dateToBR(ult):"—"}</td>
+        <td class='num zero'>${progBR}</td>
+        <td class='num'>${ult?dateToBR(ult):"—"}${desvioTag({desvio:dv})}</td>
+        <td></td>
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
         <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
     }
@@ -935,13 +975,13 @@ function renderPdDia(t, info, q, match, dia){
     const chave="dia:"+D.data; chaves.push(chave);
     const aberto = q ? true : ABERTOS.has(chave);      // com busca, abre quem tem resultado
     if(aberto) nAbertos++;
+    // cabeçalho do dia em células reais: o total do dia cai embaixo de "Cortado"
     h+=`<tr class='pd-grp st-mute${aberto?"":" collapsed"}' data-grp='${esc(chave)}'>
-      <td class='l' colspan='5'><div class='pd-row'>
-        <span class='pd-dia'>${esc(D.data)}</span>
-        <span class='pd-sem'>${esc(diaSemana(D.data))}</span>
-        <span class='pd-meta'>${pecas.length} peça(s) diferente(s) · <b>${fmt(tot)}</b> pç cortadas</span>
-        <span class='pd-lotelist'>${lotes.length} lote(s): ${esc(lotes.join(", "))}</span>
-      </div></td></tr>`;
+      <td class='l'><span class='pd-dia'>${esc(D.data)}</span><span class='pd-sem'>${esc(diaSemana(D.data))}</span>
+        <span class='pd-meta'>${pecas.length} peça(s)</span></td>
+      <td class='l'><span class='pd-lotelist'>${lotes.length} lote(s): ${esc(lotes.join(", "))}</span></td>
+      <td class='num'>${fmt(tot)}</td>
+      <td></td><td></td></tr>`;
     if(!aberto) continue;                              // recolhido: nem monta as linhas
     for(const p of pecas){
       h+=`<tr class='pd-item' data-grp='${esc(chave)}'>
