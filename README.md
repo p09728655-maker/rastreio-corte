@@ -6,6 +6,9 @@ Você exporta do sistema o relatório **“Rel Planilhamento por Funcionário”
 arrasta o arquivo na tela e o painel monta na hora:
 
 - **Cortado por lote & data** — a matriz consolidada (Data × Lote) que antes era feita na mão.
+  Logo abaixo do nº do lote vem a linha **Programada**, com a data em que ele deveria estar cortado
+  (verde se fechou até a meta, vermelho se passou), e a célula do dia da meta fica **marcada** na
+  coluna do lote — dá pra bater a data prevista com os dias em que ele realmente saiu.
 - **Por funcionário** — quanto cada pessoa cortou, por lote.
 - **Peças cortadas por lote** — **qual peça** saiu de cada lote (código + descrição), quanto
   foi cortado × o planejado, **Programada × Realizada** com o desvio em dias (`−4 d` = cortou quatro
