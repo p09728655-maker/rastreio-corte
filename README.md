@@ -38,8 +38,20 @@ arrasta o arquivo na tela e o painel monta na hora:
   data realizada** (último corte) e diz o desvio em dias: 🟢 **Adiantado** (cortou antes da meta),
   🟢 **No dia**, 🔴 **Atrasado**, 🟡 **Em andamento** (ainda não cortou e a meta não venceu).
   Um lote cortado adiantado é marcado como adiantado mesmo que a meta ainda esteja no futuro.
+- **Ficha de corte (o papel que vai pra máquina)** — botão **🖶 ficha** em cada lote, ou
+  **Fichas de corte (PDF)** pra gerar todas de uma vez. Uma folha A4 por lote com: data programada,
+  planejado × cortado × **falta**, status, os dias em que o lote saiu, e a tabela de peças
+  (código, descrição, planejado, cortado, falta) com uma **caixa pro operador marcar** e rodapé de
+  assinatura/turno. As peças **ainda não cortadas** entram na ficha — são exatamente as que o
+  operador precisa ver. O rodapé diz de onde vieram os dados e avisa se houve corte cuja ordem não
+  está no relatório por Produto.
+- **Clique numa quantidade da matriz** — abre quais peças saíram naquele dia naquele lote, com
+  máquina e operador, e diz **a quantos dias da data programada** aquilo foi cortado (serve pra
+  explicar corte solto fora da janela do lote, tipo aproveitamento de chapa).
 - **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça e o que saiu em cada dia)
-  ou `.xlsx` (uma aba por operador + abas **Peças por lote**, **Peças por dia** e **Data x Peça**).
+  ou `.xlsx` (uma aba por operador + abas **Peças por lote**, **Checklist por lote**, **Peças por dia**
+  e **Data x Peça**). A aba **Checklist por lote** é a versão planilha da ficha: um bloco por lote com
+  planejado / cortado / **falta** e coluna `OK` pra marcar — pra quem prefere imprimir do Excel.
 
 Tudo roda **no navegador** — nenhum dado é enviado para a internet.
 
