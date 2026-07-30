@@ -8,7 +8,8 @@ arrasta o arquivo na tela e o painel monta na hora:
 - **Cortado por lote & data** — a matriz consolidada (Data × Lote) que antes era feita na mão.
 - **Por funcionário** — quanto cada pessoa cortou, por lote.
 - **Peças cortadas por lote** — **qual peça** saiu de cada lote (código + descrição), quanto
-  foi cortado × o planejado, último corte, máquina e operador. Para isso, carregue **também**
+  foi cortado × o planejado, **Programada × Realizada** com o desvio em dias (`−4 d` = cortou quatro
+  dias antes da meta; `+2 d` = depois), máquina e operador. Para isso, carregue **também**
   o relatório **“Rel Planilhamento por Produto”** (botão na seção Peças, ou arraste na tela) —
   o painel cruza os dois pelo **nº da ORDEM**. Tem busca de peça (código/descrição).
 - **Peças cortadas em cada dia** — o **rastreio da data mostrando a peça**: abra um dia e veja
@@ -30,7 +31,10 @@ arrasta o arquivo na tela e o painel monta na hora:
   +1 dia** e **Lotes que pararam**.
 - **Prazo por lote** — você informa a **data-meta** de cada lote (quando ele deveria estar
   cortado) e o painel marca **🟢 no prazo / 🟡 em andamento / 🔴 atrasado**. A data-meta
-  fica guardada no próprio navegador (`localStorage`).
+  fica guardada no próprio navegador (`localStorage`). O status **compara a data programada com a
+  data realizada** (último corte) e diz o desvio em dias: 🟢 **Adiantado** (cortou antes da meta),
+  🟢 **No dia**, 🔴 **Atrasado**, 🟡 **Em andamento** (ainda não cortou e a meta não venceu).
+  Um lote cortado adiantado é marcado como adiantado mesmo que a meta ainda esteja no futuro.
 - **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça e o que saiu em cada dia)
   ou `.xlsx` (uma aba por operador + abas **Peças por lote**, **Peças por dia** e **Data x Peça**).
 
