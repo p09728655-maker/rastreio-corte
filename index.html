@@ -337,6 +337,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha .fx-rod{margin-top:14px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
   #ficha .fx-rod div{flex:1;border-top:1px solid #111;padding-top:3px}
   #ficha .fx-nota{margin-top:10px;font-size:8.5px;color:#666;line-height:1.5;font-family:var(--font-d)}
+  /* coluna Ordem: pode ter mais de uma ordem por peça — quebra linha em vez de cortar com “…” */
+  #ficha td.fx-ord{white-space:normal;overflow:visible;text-overflow:clip;font-size:9px;line-height:1.5}
   /* caixa "Como ler": tira as dúvidas na frente da máquina, sem precisar de ninguém do PCP junto */
   #ficha .fx-como{border:1px solid #bbb;border-radius:4px;padding:6px 9px;margin-bottom:8px;
     font-family:var(--font-d);font-size:8.5px;color:#333;line-height:1.6}
@@ -1376,7 +1378,7 @@ function fichaLinha(p, lote){
   const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
-    <td class='l'>${esc(ordsStr(p.ords))}</td>
+    <td class='l fx-ord'>${[...p.ords].sort((a,b)=>a-b).map(esc).join("<br>")}</td>
     <td>${g.iso?dateToBR(pz):"—"}</td>
     <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
     <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
