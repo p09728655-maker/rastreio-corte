@@ -327,15 +327,23 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 /* ================= IMPRESSÃO / PDF ================= */
 @media print{
   @page{ size:A4 landscape; margin:11mm; }
+  /* no papel, as variáveis do tema escuro viram tons de impressão — sem isso, texto que usa
+     var(--txt) (ex.: rótulos dos gráficos SVG) sai BRANCO em papel branco = invisível */
+  :root{--bg:#fff;--surface:#fff;--elevated:#eee;--border:#bbb;
+        --txt:#111;--txt2:#555;--txt3:#999;--ok:#2e7d32;--warn:#e65100;--red:#c62828}
   html,body{background:#fff !important;color:#111 !important}
   header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn,#modal{display:none !important}
   /* o PDF do relatório imprime TODAS as seções, independente da aba aberta na tela */
   #abas{display:none !important}
   .tab-hidden{display:block !important}
   .kpis.tab-hidden{display:flex !important}
-  .gr-card{background:#fff !important;border:1px solid #bbb}
+  .gr-card{background:#fff !important;border:1px solid #bbb;break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
   .gr-tit,.gr-leg{color:#333 !important}
-  #sec-graficos{break-before:page;page-break-before:always}
+  /* o gráfico escala pra caber na folha (nada de estourar a largura) e os gráficos seguem
+     os KPIs na 1ª página — o Prazo por lote é que abre página nova */
+  .gr-scroll{overflow:visible !important}
+  .gr-scroll svg{max-width:100%;height:auto}
+  #sec-prazo{break-before:page;page-break-before:always}
   /* botão é coisa de tela: o "🖶 ficha" de cada lote não vai pro papel */
   .linkbtn{display:none !important}
   /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
@@ -413,8 +421,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #tbl-pecadata .pd-sem,#tbl-pecadata .pd-meta,#tbl-pecadata .pd-lotelist,#tbl-pecadata .pd-prog{color:#555 !important}
   #tbl-pecadata td:first-child{max-width:none;position:static !important;box-shadow:none !important}
   /* imprime o que está aberto na tela — o que estiver recolhido nem existe na tabela */
-  .kpis{display:flex;gap:6px;margin-bottom:12px}
-  .kpi{flex:1;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
+  .kpis{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .kpi{flex:1 1 150px;background:#fff !important;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .kpi::before{display:none} .kpi .lbl{color:#666} .kpi .val{color:#111;font-size:18px} .kpi .val small{color:#666}
   .tbl-wrap{overflow:visible !important;border:1px solid #bbb}
   table{font-size:9px;width:100%}
@@ -1267,6 +1275,26 @@ function invasoesPorDia(){
   return out;
 }
 
+// QUAIS peças um lote invasor cortou naquele dia — com ordem de produção e o racha
+// antecipado × atrasado (cada peça contra a prevista do material dela).
+function pecasDaInvasao(data, lote){
+  const map={};
+  for(const r of (AGG?AGG.recs:[])){
+    if(r.data!==data || r.lote!==lote || !(r.qtde>0)) continue;
+    const p=PECA_MAP[r.ordem];
+    const cod=p?p.cod:"—", desc=p?p.desc:"(sem peça — carregue o relatório por Produto)";
+    const P=map[cod]||(map[cod]={cod, desc, qtde:0, antes:0, depois:0, ords:new Set(), ops:new Set(), maqs:new Set()});
+    P.qtde+=r.qtde; P.ords.add(r.ordem);
+    if(r.func) P.ops.add(r.func);
+    if(r.maq)  P.maqs.add(r.maq);
+    const mat=materialDaOrdem(r.ordem);
+    const g=getMeta(lote, mat||undefined);
+    const pz=isoToDate(g.iso), dd=brToDate(r.data);
+    if(pz&&dd){ if(diasUteisEntre(dd,pz)<0) P.antes+=r.qtde; else P.depois+=r.qtde; }
+  }
+  return Object.values(map).sort((a,b)=>b.qtde-a.qtde);
+}
+
 // Ranking do pulmão POR LOTE: quanto de cada lote entrou adiantado (antes da data prevista do
 // material da peça), quantos dias antes em média (ponderado por peça) e o corte mais adiantado.
 function antecipadoPorLote(){
@@ -2040,17 +2068,31 @@ function renderInvasao(){
       <td class='num ${sDep?"":"zero"}'>${sDep?fmt(sDep):"·"}</td>
       <td class='num'>${D.qtdInv?pct+"%":"sem invasão"}</td></tr>`;
     for(const I of D.invasores){
-      h+=`<tr><td class='l' style='padding-left:30px'>↳ <span class='lote-name'>${esc(I.lote)}</span></td>
+      const chave="inv:"+D.data+"|"+I.lote, aberto=ABERTOS.has(chave);
+      h+=`<tr class='inv-row' data-inv='${esc(chave)}' style='cursor:pointer' title='Clique para ver quais peças invadiram'>
+        <td class='l' style='padding-left:30px'><span style='color:var(--txt2);font-size:11px'>${aberto?"▾":"▸"}</span> <span class='lote-name'>${esc(I.lote)}</span></td>
         <td></td><td class='num'>${fmt(I.qtde)}</td>
         <td class='num ${I.antes?"":"zero"}'>${I.antes?fmt(I.antes):"·"}</td>
         <td class='num ${I.depois?"":"zero"}'>${I.depois?fmt(I.depois):"·"}</td>
         <td class='num'>${D.tot?Math.round(I.qtde/D.tot*100)+"%":""}</td></tr>`;
+      if(!aberto) continue;
+      for(const P of pecasDaInvasao(D.data, I.lote)){
+        h+=`<tr><td class='l' style='padding-left:52px'><span class='mono peca-cod'>${esc(P.cod)}</span> <span style='font-size:12px'>${esc(P.desc)}</span> <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(P.ords))}</span></td>
+          <td class='l' style='font-size:11.5px' title='Operador que cortou'><span class='pd-lotes'>op</span> ${esc([...P.ops].join(", "))}</td>
+          <td class='num'>${fmt(P.qtde)}</td>
+          <td class='num ${P.antes?"":"zero"}'>${P.antes?fmt(P.antes):"·"}</td>
+          <td class='num ${P.depois?"":"zero"}'>${P.depois?fmt(P.depois):"·"}</td>
+          <td></td></tr>`;
+      }
     }
   }
   h+=`<tr class='trtot'><td class='l'>Período: ${diasComInvasao} de ${dias.length} dia(s) com invasão</td>
     <td>${fmt(totDia-totInv)}</td><td>${fmt(totInv)}</td><td></td><td></td>
     <td>${totDia?Math.round(totInv/totDia*100)+"%":""}</td></tr></tbody>`;
   t.innerHTML=h;
+  t.querySelectorAll(".inv-row").forEach(tr=>{
+    tr.addEventListener("click",()=>{ toggleAberto(tr.dataset.inv); renderInvasao(); });
+  });
 }
 
 function renderKpis(){
@@ -2280,12 +2322,15 @@ function exportCsv(){
   if(invs.length){
     rows.push([]);
     rows.push(["Invasão de dias — quem cortou no dia previsto de outro lote"]);
-    rows.push(["Dia","Dono do dia","Cortado do dono","Lote invasor","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]);
+    rows.push(["Dia","Dono do dia","Cortado do dono","Lote invasor","Peça (código)","Peça (descrição)","Ordens","Operador","Máquina","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]);
     for(const D of invs){
       const dono=D.donos.map(o=>o.mat+" "+o.lote).join(" · ");
-      if(!D.invasores.length){ rows.push([D.data, dono, D.qtdDono, "(sem invasão)", 0, "", "", "0%"]); continue; }
-      for(const I of D.invasores)
-        rows.push([D.data, dono, D.qtdDono, I.lote, I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+      if(!D.invasores.length){ rows.push([D.data, dono, D.qtdDono, "(sem invasão)", "", "", "", "", "", 0, "", "", "0%"]); continue; }
+      for(const I of D.invasores){
+        rows.push([D.data, dono, D.qtdDono, I.lote, "(total)", "", "", "", "", I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+        for(const P of pecasDaInvasao(D.data, I.lote))
+          rows.push([D.data, dono, "", I.lote, P.cod, P.desc, ordsStr(P.ords), [...P.ops].join(" / "), [...P.maqs].join(" / "), P.qtde, P.antes, P.depois, ""]);
+      }
     }
   }
   if(Object.keys(PECA_MAP).length){
@@ -2374,12 +2419,15 @@ function exportPorOperador(){
   // aba "Invasão": quem cortou no dia previsto de outro lote
   const invx=invasoesPorDia();
   if(invx.length){
-    const iv=[["Dia","Dono do dia","Cortado do dono","Lote invasor","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]];
+    const iv=[["Dia","Dono do dia","Cortado do dono","Lote invasor","Peça (código)","Peça (descrição)","Ordens","Operador","Máquina","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]];
     for(const D of invx){
       const dono=D.donos.map(o=>o.mat+" "+o.lote).join(" · ");
-      if(!D.invasores.length){ iv.push([D.data, dono, D.qtdDono, "(sem invasão)", 0, "", "", "0%"]); continue; }
-      for(const I of D.invasores)
-        iv.push([D.data, dono, D.qtdDono, I.lote, I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+      if(!D.invasores.length){ iv.push([D.data, dono, D.qtdDono, "(sem invasão)", "", "", "", "", "", 0, "", "", "0%"]); continue; }
+      for(const I of D.invasores){
+        iv.push([D.data, dono, D.qtdDono, I.lote, "(total)", "", "", "", "", I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+        for(const P of pecasDaInvasao(D.data, I.lote))
+          iv.push([D.data, dono, "", I.lote, P.cod, P.desc, ordsStr(P.ords), [...P.ops].join(" / "), [...P.maqs].join(" / "), P.qtde, P.antes, P.depois, ""]);
+      }
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(iv), "Invasão");
   }
@@ -2551,9 +2599,15 @@ document.getElementById("btn-print-invasao").addEventListener("click",()=>{
   const dt=String(n.getDate()).padStart(2,"0")+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getFullYear()).slice(-2)+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
   document.getElementById("ph-meta").textContent=(per?per+" · ":"")+"Gerado em "+dt;
   document.body.classList.add("modo-invasao");
+  // no papel as peças invasoras saem TODAS abertas (é onde se pega a invasão peça a peça,
+  // com ordem e operador) — depois volta pro que estava aberto na tela
+  const abertosAntes=new Set(ABERTOS);
+  invasoesPorDia().forEach(D=>D.invasores.forEach(I=>ABERTOS.add("inv:"+D.data+"|"+I.lote)));
+  renderInvasao();
   const tituloAntes=document.title;
   document.title=("Invasão de dias"+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
   const volta=()=>{ document.body.classList.remove("modo-invasao"); document.title=tituloAntes;
+                    ABERTOS.clear(); abertosAntes.forEach(k=>ABERTOS.add(k)); renderInvasao();
                     window.removeEventListener("afterprint",volta); };
   window.addEventListener("afterprint",volta);
   window.print();
