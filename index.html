@@ -487,7 +487,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-pulmao">
       <h2>Ranking do pulmão <span class="tag">quem mais antecipou</span></h2>
       <div class="sec-sub">Peças cortadas <b>antes da data prevista do material</b> — corte de lote futuro, que vai pro pulmão em vez de fechar o lote do dia.
-        À esquerda, os <b>lotes</b> que mais entraram adiantados (média = quantos dias antes, ponderado por peça); à direita, os <b>dias</b> em que a máquina mais cortou lote futuro.</div>
+        <b>Lotes</b> que mais entraram adiantados (média = quantos dias antes, ponderado por peça), <b>dias</b> em que a máquina mais cortou lote futuro
+        e <b>operadores</b> com mais corte antecipado — “% do que cortou” é a fatia da produção do operador que era lote futuro.
+        A sequência em geral vem do sequenciamento, então o ranking por operador serve pra achar <b>onde</b> a antecipação acontece, não culpado.</div>
       <div class="pulmao-grid" id="pulmao-grid"></div>
     </section>
 
@@ -1117,6 +1119,35 @@ function antecipadoPorLote(){
     .sort((a,b)=>b.ant-a.ant || loteNum(a.lote)-loteNum(b.lote));
 }
 
+// Ranking POR OPERADOR: quanto do que cada um cortou era peça de lote futuro (antes da prevista).
+// Mede onde a antecipação acontece — a sequência em geral vem de cima, então serve pra conversar
+// sobre o sequenciamento com quem opera, não pra apontar culpado.
+// Fora do ranking por APONTAMENTO ERRADO (o corte é real e continua nos totais do lote,
+// mas o operador registrado não é quem cortou — então não entra na lista por operador):
+const OPS_FORA_RANKING=["RAFAELA","LUCAS"];
+function operadorForaDoRanking(nome){
+  const s=String(nome||"").toUpperCase();
+  return OPS_FORA_RANKING.some(n=>s.includes(n));
+}
+function antecipadoPorOperador(){
+  const map={};
+  for(const r of (AGG?AGG.recs:[])){
+    if(!(r.qtde>0) || operadorForaDoRanking(r.func)) continue;
+    const mat=materialDaOrdem(r.ordem);
+    const g=getMeta(r.lote, mat||undefined);
+    const pz=isoToDate(g.iso), d=brToDate(r.data);
+    if(!pz||!d) continue;
+    const k=r.func||"—";
+    const O=map[k]||(map[k]={func:k, ant:0, tot:0, somaDias:0, lotesAnt:new Set()});
+    O.tot+=r.qtde;
+    const dv=daysBetween(d,pz);
+    if(dv<0){ O.ant+=r.qtde; O.somaDias+=(-dv)*r.qtde; O.lotesAnt.add(r.lote); }
+  }
+  return Object.values(map)
+    .map(O=>({...O, pct:O.tot?Math.round(O.ant/O.tot*100):0, media:O.ant?O.somaDias/O.ant:0, nLotes:O.lotesAnt.size}))
+    .sort((a,b)=>b.ant-a.ant || String(a.func).localeCompare(String(b.func),"pt-BR"));
+}
+
 function renderMatriz(){
   const t=document.getElementById("tbl-matriz");
   const list = OP_FILTER ? AGG.recs.filter(r=>r.funcCod===OP_FILTER) : AGG.recs;
@@ -1653,7 +1684,18 @@ function renderPulmao(){
       <td class='num ${D.lotesFut?"":"zero"}'>${D.lotesFut||"·"}</td></tr>`;
   }
   hd+=`</tbody></table></div>`;
-  el.innerHTML=`<div>${hl}</div><div>${hd}</div>`;
+  const ops=antecipadoPorOperador().filter(x=>x.ant>0);
+  const maxO=ops.length?ops[0].ant:1;
+  let ho=`<div class='rk-tit'>Operadores que mais antecipam</div>
+    <div class='tbl-wrap'><table><thead><tr><th class='l'>Operador</th><th>Antecipado</th><th>% do que cortou</th><th>Média</th><th>Lotes</th></tr></thead><tbody>`;
+  for(const O of ops){
+    ho+=`<tr><td class='l'>${esc(O.func)}<div class='barra'><i style='width:${Math.max(2,Math.round(O.ant/maxO*100))}%'></i></div></td>
+      <td class='num'>${fmt(O.ant)}</td><td class='num'>${O.pct}%</td>
+      <td class='num'>${O.media.toLocaleString("pt-BR",{maximumFractionDigits:1})} d antes</td>
+      <td class='num'>${O.nLotes}</td></tr>`;
+  }
+  ho+=`</tbody></table></div>`;
+  el.innerHTML=`<div>${hl}</div><div>${hd}</div>${ops.length?`<div>${ho}</div>`:""}`;
 }
 
 function renderKpis(){
@@ -1860,6 +1902,13 @@ function exportCsv(){
     rows.push(["Data","Antecipado (pç)","% do dia","Lotes futuros"]);
     for(const D of AGG.datas.map(d=>({data:d, ...(ANT[d]||{ant:0,tot:0,lotesFut:0})})).filter(x=>x.ant>0).sort((a,b)=>b.ant-a.ant))
       rows.push([D.data, D.ant, (D.tot?Math.round(D.ant/D.tot*100):0)+"%", D.lotesFut]);
+    const rko=antecipadoPorOperador().filter(x=>x.ant>0);
+    if(rko.length){
+      rows.push([]);
+      rows.push(["Operadores que mais antecipam"]);
+      rows.push(["Operador","Antecipado (pç)","% do que cortou","Média (dias antes)","Lotes antecipados"]);
+      for(const O of rko) rows.push([O.func, O.ant, O.pct+"%", O.media.toFixed(1).replace(".",","), O.nLotes]);
+    }
   }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
@@ -1930,6 +1979,13 @@ function exportPorOperador(){
     const ANTx=antecipadoPorDia(AGG.recs);
     for(const D of AGG.datas.map(d=>({data:d, ...(ANTx[d]||{ant:0,tot:0,lotesFut:0})})).filter(x=>x.ant>0).sort((a,b)=>b.ant-a.ant))
       pa.push([D.data, D.ant, (D.tot?Math.round(D.ant/D.tot*100):0)+"%", D.lotesFut]);
+    const rko=antecipadoPorOperador().filter(x=>x.ant>0);
+    if(rko.length){
+      pa.push([]);
+      pa.push(["Operadores que mais antecipam"]);
+      pa.push(["Operador","Antecipado (pç)","% do que cortou","Média (dias antes)","Lotes antecipados"]);
+      for(const O of rko) pa.push([O.func, O.ant, O.pct+"%", +O.media.toFixed(1), O.nLotes]);
+    }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pa), "Pulmão");
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
