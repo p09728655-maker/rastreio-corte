@@ -297,6 +297,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   @page{ size:A4 landscape; margin:11mm; }
   html,body{background:#fff !important;color:#111 !important}
   header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn,#modal{display:none !important}
+  /* botão é coisa de tela: o "🖶 ficha" de cada lote não vai pro papel */
+  .linkbtn{display:none !important}
   /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
   body.modo-ficha main,body.modo-ficha header,body.modo-ficha footer{display:none !important}
   body.modo-ficha #ficha{display:block !important}
