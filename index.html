@@ -590,6 +590,8 @@ let PROD_FILES = [];    // [{nome, period, n, novos}] — só p/ mostrar o que j
 
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
+// lista de ordens de produção (Set) -> "12345 / 12346" — a chave pra conferir no ERP
+const ordsStr = s => [...(s||[])].sort((a,b)=>a-b).join(" / ");
 // escapa texto vindo do arquivo (nome de funcionário, descrição de lote…) antes de ir pro innerHTML
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function parseBR(x){
@@ -837,8 +839,9 @@ function buildPecaLote(){
     const L = byLote[r.lote] || (byLote[r.lote]={pecas:{}, totCort:0});
     const cod  = p ? p.cod  : "—";
     const desc = p ? p.desc : "(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
-    const P = L.pecas[cod] || (L.pecas[cod]={cod, desc, cortado:0, planejado:0, datas:new Set(), maqs:new Set(), ops:new Set()});
+    const P = L.pecas[cod] || (L.pecas[cod]={cod, desc, cortado:0, planejado:0, datas:new Set(), maqs:new Set(), ops:new Set(), ords:new Set()});
     P.cortado += r.qtde;
+    P.ords.add(r.ordem);                     // nº da ORDEM de produção — a chave pra conferir no ERP
     if(p && !ordVista.has(r.ordem)){ P.planejado += (p.qtdeOrdem||0); ordVista.add(r.ordem); } // planejado 1x por ordem
     if(r.data) P.datas.add(r.data);
     if(r.maq)  P.maqs.add(r.maq);
@@ -1171,8 +1174,8 @@ function antecipadoDoOperador(func){
     const p=PECA_MAP[r.ordem];
     const cod=p?p.cod:"—", descP=p?p.desc:"(sem peça — carregue o relatório por Produto)";
     const k=r.data+"␟"+r.lote+"␟"+cod;
-    const E=map[k]||(map[k]={data:r.data, lote:r.lote, cod, desc:descP, qtde:0, dias:-dv});
-    E.qtde+=r.qtde; if(-dv>E.dias) E.dias=-dv;
+    const E=map[k]||(map[k]={data:r.data, lote:r.lote, cod, desc:descP, qtde:0, dias:-dv, ords:new Set()});
+    E.qtde+=r.qtde; if(-dv>E.dias) E.dias=-dv; E.ords.add(r.ordem);
   }
   return Object.values(map).sort((a,b)=>b.qtde-a.qtde || brToDate(a.data)-brToDate(b.data));
 }
@@ -1262,7 +1265,7 @@ function abrirDetalhe(data, lote){
   if(!pecas.length) h+=`<tr><td class='l' colspan='5' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
   for(const p of pecas){
     h+=`<tr><td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
-      <td class='num'>${esc([...p.ords].sort((a,b)=>a-b).join(", "))}</td>
+      <td class='num'>${esc(ordsStr(p.ords))}</td>
       <td class='num'>${fmt(p.cortado)}</td>
       <td class='l'>${esc([...p.maqs].join(", "))}</td>
       <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
@@ -1373,6 +1376,7 @@ function fichaLinha(p, lote){
   const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
+    <td class='l'>${esc(ordsStr(p.ords))}</td>
     <td>${g.iso?dateToBR(pz):"—"}</td>
     <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
     <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
@@ -1430,6 +1434,7 @@ function fichaDeLote(lote){
       janela <b>${fmtDvInt(K.minDv)} a ${fmtDvInt(K.maxDv)} d</b>${K.semMeta?` · ${fmt(K.semMeta)} pç sem data prevista (fora do %)`:""}
     </div>`:""}
     <div class='fx-como'><b>Como ler:</b>
+      <b>Ordem</b> = nº da ordem de produção no sistema — é por ela que se confere qualquer linha no ERP.
       <b>Prevista</b> = data de corte do material na Programação (MDF corta antes — vai pra pintura).
       <b>Realizada</b> = data do <b>último</b> corte da peça; <b>*</b> = a peça saiu em mais de um dia.
       O desvio ao lado compara com a prevista: <b>−2 d</b> = 2 dias antes · <b>+1 d</b> = 1 dia depois · <b>no dia</b> = na data.
@@ -1443,14 +1448,14 @@ function fichaDeLote(lote){
       return `<div class='fx-grp'>${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}
         ${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</div>
       <table><colgroup>
-        <col style='width:86px'><col><col style='width:68px'><col style='width:112px'>
+        <col style='width:86px'><col><col style='width:72px'><col style='width:68px'><col style='width:112px'>
         <col style='width:68px'><col style='width:64px'><col style='width:58px'><col style='width:54px'>
       </colgroup><thead><tr>
-        <th class='l'>Peça (código)</th><th class='l'>Descrição</th>
+        <th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th>
         <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Cortado</th><th>Falta</th><th class='c'>OK</th>
       </tr></thead><tbody>
       ${gr.lista.map(p=>fichaLinha(p,lote)).join("")}
-      <tr class='fx-sub'><td class='l' colspan='4'><b>Subtotal ${esc(gr.mat||"—")}</b></td><td><b>${sP?fmt(sP):"—"}</b></td>
+      <tr class='fx-sub'><td class='l' colspan='5'><b>Subtotal ${esc(gr.mat||"—")}</b></td><td><b>${sP?fmt(sP):"—"}</b></td>
         <td><b>${fmt(sC)}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
       </tbody></table>`;
     }).join("")}
@@ -1542,7 +1547,7 @@ function renderPeca(){
       const pzm=isoToDate(gm.iso);
       const dv=(pzm&&ult)?daysBetween(ult,pzm):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
-        <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+        <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(p.ords))}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
@@ -1641,7 +1646,7 @@ function renderPdDia(t, info, q, match, dia){
     if(!aberto) continue;                              // recolhido: nem monta as linhas
     for(const p of pecas){
       h+=`<tr class='pd-item' data-grp='${esc(chave)}'>
-        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(p.ords))}</span></td>
         <td class='l'><span class='lote-name'>${esc(p.lote)}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
@@ -1978,33 +1983,33 @@ function exportCsv(){
       for(const O of rko) rows.push([O.func, O.ant, O.pct+"%", O.media.toFixed(1).replace(".",","), O.nLotes]);
       rows.push([]);
       rows.push(["O que cada operador antecipou"]);
-      rows.push(["Operador","Peça (código)","Peça (descrição)","Lote","Dia","Antecipado (pç)","Dias antes"]);
+      rows.push(["Operador","Peça (código)","Peça (descrição)","Ordens","Lote","Dia","Antecipado (pç)","Dias antes"]);
       for(const O of rko) for(const E of antecipadoDoOperador(O.func))
-        rows.push([O.func, E.cod, E.desc, E.lote, E.data, E.qtde, E.dias]);
+        rows.push([O.func, E.cod, E.desc, ordsStr(E.ords), E.lote, E.data, E.qtde, E.dias]);
     }
   }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
-    rows.push(["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]);
+    rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]);
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        rows.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        rows.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
     }
     // rastreio da data com a peça: o que saiu em cada dia
     rows.push([]);
     rows.push(["Peças cortadas em cada dia"]);
-    rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]);
+    rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","Máquina","Operador"]);
     for(const D of buildPecaDia()){
       for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
-        rows.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        rows.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
-      rows.push(["", "", "", "Total do dia", "", D.tot, "", ""]);
+      rows.push(["", "", "", "Total do dia", "", "", D.tot, "", ""]);
     }
   }
   const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
@@ -2060,21 +2065,21 @@ function exportPorOperador(){
       for(const O of rko) pa.push([O.func, O.ant, O.pct+"%", +O.media.toFixed(1), O.nLotes]);
       pa.push([]);
       pa.push(["O que cada operador antecipou"]);
-      pa.push(["Operador","Peça (código)","Peça (descrição)","Lote","Dia","Antecipado (pç)","Dias antes"]);
+      pa.push(["Operador","Peça (código)","Peça (descrição)","Ordens","Lote","Dia","Antecipado (pç)","Dias antes"]);
       for(const O of rko) for(const E of antecipadoDoOperador(O.func))
-        pa.push([O.func, E.cod, E.desc, E.lote, E.data, E.qtde, E.dias]);
+        pa.push([O.func, E.cod, E.desc, ordsStr(E.ords), E.lote, E.data, E.qtde, E.dias]);
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pa), "Pulmão");
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
-    const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
+    const aoa=[["Lote","Peça (código)","Peça (descrição)","Ordens","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        aoa.push([lote, p.cod, p.desc, p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        aoa.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
@@ -2098,25 +2103,25 @@ function exportPorOperador(){
       const K=kpisDoLote(lote);
       if(K) ck.push(["% no prazo", K.pNoPrazo+"%", "% adiantado", K.pAntes+"%", "% atrasado", K.pDepois+"%",
                      "Desvio médio", fmtDesvio(K.medio), "Janela", fmtDvInt(K.minDv)+" a "+fmtDvInt(K.maxDv)+" d"]);
-      ck.push(["Peça (código)","Descrição","Material","Prevista","Realizada","Planejado","Cortado","Falta","OK"]);
+      ck.push(["Peça (código)","Descrição","Ordens","Material","Prevista","Realizada","Planejado","Cortado","Falta","OK"]);
       for(const p of pecas){
         const mat=materialDe(p.desc), gm=getMeta(lote, mat||undefined);
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        ck.push([p.cod, p.desc, mat||"—", gm.iso?dateToBR(isoToDate(gm.iso)):"—", ult?dateToBR(ult):"—",
+        ck.push([p.cod, p.desc, ordsStr(p.ords), mat||"—", gm.iso?dateToBR(isoToDate(gm.iso)):"—", ult?dateToBR(ult):"—",
                  p.planejado||0, p.cortado, saldoDe(p), ""]);
       }
-      ck.push(["","Total","","","", totP, totC, totF, ""]);
+      ck.push(["","Total","","","","", totP, totC, totF, ""]);
       ck.push([]);
     }
     if(ck.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ck), "Checklist por lote");
 
     // aba: o que foi cortado em cada dia, peça a peça (mesma leitura da tela)
-    const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Lote","Cortado","Máquina","Operador"]];
+    const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","Máquina","Operador"]];
     for(const D of buildPecaDia()){
       for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
-        dd.push([D.data, diaSemana(D.data), p.cod, p.desc, p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        dd.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
-      dd.push(["","","","Total do dia","",D.tot,"",""]);
+      dd.push(["","","","Total do dia","","",D.tot,"",""]);
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dd), "Peças por dia");
 
