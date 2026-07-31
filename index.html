@@ -852,19 +852,20 @@ function buildPecaLote(){
 // do relatório por Funcionário), só que com a peça (cód+descrição) que veio do relatório por Produto.
 // Agrupa por DIA -> "o que foi cortado no dia 23/07": peça, lote, quanto saiu, máquina e operador.
 // Só entra operação com QTDE PROD. > 0 (o que realmente saiu), igual à seção "Peças cortadas por lote".
-function buildPecaDia(){
+function buildPecaDia(list){
   const byDia={};
-  for(const r of (AGG?AGG.recs:[])){
+  for(const r of (list || (AGG?AGG.recs:[]))){
     if(!(r.qtde>0)) continue;
     const p    = PECA_MAP[r.ordem] || null;
     const cod  = p ? p.cod  : "—";
     const desc = p ? p.desc : "(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
     const D = byDia[r.data] || (byDia[r.data]={data:r.data, tot:0, lotes:new Set(), pecas:{}});
     const k = r.lote+"␟"+cod;                 // mesma peça em lotes diferentes = linhas diferentes
-    const P = D.pecas[k] || (D.pecas[k]={cod, desc, lote:r.lote, cortado:0, maqs:new Set(), ops:new Set()});
+    const P = D.pecas[k] || (D.pecas[k]={cod, desc, lote:r.lote, cortado:0, maqs:new Set(), ops:new Set(), ords:new Set()});
     P.cortado += r.qtde;
     if(r.maq)  P.maqs.add(r.maq);
     if(r.func) P.ops.add(r.func);
+    P.ords.add(r.ordem);                      // nº da ORDEM de produção (pode haver mais de uma por peça)
     D.tot += r.qtde; D.lotes.add(r.lote);
   }
   return Object.values(byDia).sort((a,b)=>brToDate(a.data)-brToDate(b.data));
@@ -1008,15 +1009,18 @@ function kpisDoLote(lote){
   }
   if(!tot) return null;
   const pct=v=>Math.round(v/tot*100);
+  // "No prazo" é o complemento exato de "Atrasado" — arredondar os dois separado podia dar 99/101%
+  const pDep=pct(depois);
   return {tot, antes, noDia, depois, semMeta,
-          pAntes:pct(antes), pNoDia:pct(noDia), pDepois:pct(depois), pNoPrazo:pct(antes+noDia),
+          pAntes:pct(antes), pNoDia:pct(noDia), pDepois:pDep, pNoPrazo:100-pDep,
           medio:somaDv/tot, minDv, maxDv};
 }
-// desvio médio (fração de dias) -> "−2,8 d" · desvio inteiro -> "−3" / "+2" / "0"
+// desvio médio (fração de dias) -> "−2,8 d" · arredonda ANTES do sinal pra nunca sair "−0,0 d"
 function fmtDesvio(v){
   if(v===null||v===undefined) return "—";
-  const a=Math.abs(v).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
-  return (v<0?"−":v>0?"+":"")+a+" d";
+  const r=Math.round(v*10)/10;
+  const a=Math.abs(r).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
+  return (r<0?"−":r>0?"+":"")+a+" d";
 }
 function fmtDvInt(d){ return d===0?"0":(d<0?"−"+(-d):"+"+d); }
 // os cartõezinhos de KPI do lote (usados no modal de detalhe da célula)
@@ -1180,7 +1184,9 @@ function renderMatriz(){
   const ANT = antecipadoPorDia(list);
   let h="<thead><tr><th class='l'>Data</th>";
   for(const l of M.lotes) h+=`<th>${esc(l)}</th>`;
-  h+="<th>Lotes no dia</th><th>Antecipado (pulmão)</th><th>Total dia</th></tr>";
+  h+="<th title='Quantos lotes diferentes tiveram corte na data · em vermelho, quantos eram lotes futuros'>Lotes no dia</th>"+
+     "<th title='Peças cortadas antes da data prevista do material delas — o % é sobre as peças do dia que têm data prevista'>Antecipado (pulmão)</th>"+
+     "<th>Total dia</th></tr>";
   // 2ª linha do cabeçalho: quando cada lote DEVERIA estar cortado (Programação ou data digitada).
   // Fica logo embaixo do LT pra dar pra comparar com os dias em que ele realmente saiu.
   h+="<tr class='trprog'><th class='l'>Prevista MDF / MDP</th>";
@@ -1245,18 +1251,23 @@ function abrirDetalhe(data, lote){
     if(A.lotesFut) sub += `, ${A.lotesFut} deles futuro${A.lotesFut===1?"":"s"}`;
     if(A.ant) sub += ` · ${fmt(A.ant)} pç antecipadas no dia (${A.tot?Math.round(A.ant/A.tot*100):0}% foi pro pulmão)`;
   }
+  if(OP_FILTER){
+    const o=(AGG.ops||[]).find(x=>x.cod===OP_FILTER);
+    sub += ` · filtro ativo: a lista abaixo é só do operador ${o?o.cod+" "+o.nome:OP_FILTER} (os números "da fábrica" acima são de todos)`;
+  }
   document.getElementById("modal-sub").textContent=sub;
   document.getElementById("modal-kpis").innerHTML=kpiCardsLote(lote);
 
-  let h=`<table><thead><tr><th class='l'>Peça</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
-  if(!pecas.length) h+=`<tr><td class='l' colspan='4' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
+  let h=`<table><thead><tr><th class='l'>Peça</th><th>Ordem</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
+  if(!pecas.length) h+=`<tr><td class='l' colspan='5' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
   for(const p of pecas){
     h+=`<tr><td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+      <td class='num'>${esc([...p.ords].sort((a,b)=>a-b).join(", "))}</td>
       <td class='num'>${fmt(p.cortado)}</td>
       <td class='l'>${esc([...p.maqs].join(", "))}</td>
       <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
   }
-  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
+  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td></td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
   document.getElementById("modal-corpo").innerHTML=h;
   document.getElementById("modal").classList.remove("hidden");
 }
@@ -1343,8 +1354,10 @@ function pecasDoLote(lote, incluirNaoCortadas){
 function saldoDe(p){ return Math.max(0, (p.planejado||0)-(p.cortado||0)); }
 
 // Quais peças saíram num dia específico, dentro de um lote (usado no clique da matriz).
+// Respeita o filtro de operador: a lista tem que bater com o número da célula clicada.
 function pecasDoDiaLote(data, lote){
-  const D=buildPecaDia().find(x=>x.data===data);
+  const list = OP_FILTER ? (AGG?AGG.recs.filter(r=>r.funcCod===OP_FILTER):[]) : null;
+  const D=buildPecaDia(list).find(x=>x.data===data);
   if(!D) return [];
   return ordenaPecas(Object.values(D.pecas).filter(p=>p.lote===lote), p=>p.cortado);
 }
@@ -1774,7 +1787,8 @@ function renderKpis(){
     {lbl:"Funcionários", val:AGG.funcs.length, cls:""},
     {lbl:"Dias no arquivo", val:AGG.datas.length, cls:""},
     {lbl:"Lotes por dia", val:mediaLotes.toLocaleString("pt-BR",{maximumFractionDigits:1}), sub:"média · máx "+maxLotes, cls:""},
-    {lbl:"Antecipado (pulmão)", val:pAnt+"%", sub:fmt(totAnt)+" pç antes da prevista", cls: pAnt>=25?"red":(pAnt>0?"warn":"ok")},
+    {lbl:"Antecipado (pulmão)", val:pAnt+"%", sub:fmt(totAnt)+" pç antes da prevista", cls: pAnt>=25?"red":(pAnt>0?"warn":"ok"),
+     tip:"Percentual sobre as "+fmt(totComMeta)+" pç que têm data prevista (Programação ou data manual). Peça sem data prevista fica fora da conta."},
     {lbl:"Lotes em +1 dia", val:varios, sub:varios?("de "+AGG.lotes.length):"", cls:varios?"warn":"ok"},
     {lbl:"Lotes que pararam", val:picados, sub:"no meio", cls:picados?"red":"ok"},
     {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
@@ -1788,7 +1802,7 @@ function renderKpis(){
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
     cards.push({lbl:"Peças cortadas", val:set.size, sub:"tipos", cls:""});
   }
-  k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
+  k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'${c.tip?` title='${esc(c.tip)}'`:""}><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
 }
 
 function renderAll(period){
