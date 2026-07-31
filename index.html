@@ -60,6 +60,24 @@ main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
   text-transform:uppercase;letter-spacing:1px;padding:7px 14px;border-radius:6px;cursor:pointer;margin-left:auto}
 .linkbtn:hover{border-color:var(--acc);color:var(--acc)}
 
+/* Abas: o painel cresceu — cada assunto tem a sua tela, e a Visão geral abre com KPI + gráficos */
+#abas{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;position:sticky;top:54px;z-index:15;
+  background:var(--bg);padding:10px 0 8px}
+.aba-btn{background:var(--surface);border:.5px solid var(--border);color:var(--txt2);font-family:var(--font-d);
+  font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:8px 16px;border-radius:6px;cursor:pointer}
+.aba-btn:hover{border-color:var(--acc);color:var(--acc)}
+.aba-btn.on{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
+.tab-hidden{display:none!important}
+
+/* Gráficos da Visão geral */
+.gr-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.gr-card{background:var(--surface);border:.5px solid var(--border);border-radius:7px;padding:14px 16px}
+.gr-tit{font-family:var(--font-d);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt2)}
+.gr-leg{display:flex;gap:16px;margin:8px 0 4px;font-family:var(--font-d);font-size:10.5px;color:var(--txt2);flex-wrap:wrap}
+.gr-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.gr-scroll{overflow-x:auto}
+.gr-scroll svg{display:block}
+
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
 .kpi{position:relative;background:var(--surface);border:.5px solid var(--border);border-radius:7px;padding:14px 16px;overflow:hidden}
@@ -311,6 +329,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   @page{ size:A4 landscape; margin:11mm; }
   html,body{background:#fff !important;color:#111 !important}
   header,footer,#drop,#err,.prazo-actions,.foot-actions,#filebar,#peca-warn,#modal{display:none !important}
+  /* o PDF do relatório imprime TODAS as seções, independente da aba aberta na tela */
+  #abas{display:none !important}
+  .tab-hidden{display:block !important}
+  .kpis.tab-hidden{display:flex !important}
+  .gr-card{background:#fff !important;border:1px solid #bbb}
+  .gr-tit,.gr-leg{color:#333 !important}
+  #sec-graficos{break-before:page;page-break-before:always}
   /* botão é coisa de tela: o "🖶 ficha" de cada lote não vai pro papel */
   .linkbtn{display:none !important}
   /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
@@ -449,7 +474,25 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       </div>
     </div>
 
+    <nav id="abas"></nav>
+
     <div class="kpis" id="kpis"></div>
+
+    <section id="sec-graficos">
+      <h2>Gráficos <span class="tag">o período de relance</span></h2>
+      <div class="gr-grid">
+        <div class="gr-card">
+          <div class="gr-tit">Cortado por dia — quanto era antecipação (pulmão)</div>
+          <div class="gr-leg"><span><i style="background:#FFAD33"></i>Antecipado (antes da prevista)</span><span><i style="background:#7A7A7A"></i>Demais peças</span></div>
+          <div class="gr-scroll" id="gr-dia"></div>
+        </div>
+        <div class="gr-card">
+          <div class="gr-tit">Desvio por lote — dias úteis vs prevista (pelo último corte)</div>
+          <div class="gr-leg"><span><i style="background:#26A69A"></i>Adiantado (−)</span><span><i style="background:#EF5350"></i>Atrasado (+)</span></div>
+          <div class="gr-scroll" id="gr-desvio"></div>
+        </div>
+      </div>
+    </section>
 
     <section id="sec-prazo">
       <h2>Prazo por lote <span class="tag">meta × realizado</span></h2>
@@ -1889,6 +1932,90 @@ function renderPulmao(){
   });
 }
 
+/* ---------- Abas ---------- */
+const ABAS=[
+  {id:"geral",  nome:"Visão geral"},
+  {id:"prazo",  nome:"Prazo por lote",       secs:["sec-prazo"]},
+  {id:"matriz", nome:"Matriz & Funcionário", secs:["sec-matriz","sec-func"]},
+  {id:"pecas",  nome:"Peças",                secs:["sec-peca","sec-pecadata"]},
+  {id:"pulmao", nome:"Pulmão & Invasão",     secs:["sec-pulmao","sec-invasao"]},
+];
+let ABA_ATUAL="geral";
+try{ ABA_ATUAL=localStorage.getItem("rastreioCorte:aba")||"geral"; }catch(e){}
+function aplicaAba(){
+  const aba=ABAS.find(a=>a.id===ABA_ATUAL)||ABAS[0];
+  const mostra=(id,sim)=>{ const el=document.getElementById(id); if(el) el.classList.toggle("tab-hidden",!sim); };
+  mostra("kpis", aba.id==="geral"); mostra("sec-graficos", aba.id==="geral");
+  for(const s of ["sec-prazo","sec-matriz","sec-func","sec-peca","sec-pecadata","sec-pulmao","sec-invasao"])
+    mostra(s, !!(aba.secs&&aba.secs.includes(s)));
+  document.querySelectorAll(".aba-btn").forEach(b=>b.classList.toggle("on", b.dataset.aba===aba.id));
+}
+function setAba(id){
+  ABA_ATUAL=id; try{ localStorage.setItem("rastreioCorte:aba",id); }catch(e){}
+  aplicaAba();
+  if(id==="matriz"&&AGG) renderMatriz();   // remede a altura do cabeçalho grudado (era 0 escondida)
+  if(id==="geral"&&AGG)  renderGraficos(); // largura real do card só existe com a aba visível
+  window.scrollTo({top:0});
+}
+
+/* ---------- Gráficos da Visão geral (SVG, sem biblioteca) ----------
+   Cores validadas p/ daltonismo e contraste no fundo escuro:
+   âmbar #FFAD33 (antecipado) sobre cinza neutro #7A7A7A · teal #26A69A × vermelho #EF5350. */
+function renderGraficos(){
+  const el1=document.getElementById("gr-dia"), el2=document.getElementById("gr-desvio");
+  if(!el1||!el2||!AGG) return;
+  // 1) barras por dia: base âmbar = antecipado, topo cinza = o resto (gap de 2px entre os dois)
+  const ANT=antecipadoPorDia(AGG.recs);
+  const dias=AGG.datas;
+  const max=Math.max(1,...dias.map(d=>AGG.dataT[d]||0));
+  const bw=30, gap=16, padT=24, padB=20, H=180;
+  const W=dias.length*(bw+gap)+gap;
+  let s=`<svg viewBox="0 0 ${W} ${H+padT+padB}" width="${W}" height="${H+padT+padB}" role="img" aria-label="Cortado por dia">`;
+  s+=`<line x1="0" y1="${padT+H}" x2="${W}" y2="${padT+H}" stroke="var(--border)" stroke-width="1"/>`;
+  dias.forEach((d,i)=>{
+    const x=gap+i*(bw+gap);
+    const tot=AGG.dataT[d]||0, ant=ANT[d]?ANT[d].ant:0;
+    const hA=Math.round(ant/max*H), hR=Math.round((tot-ant)/max*H);
+    const yA=padT+H-hA, yR=yA-(hR?2:0)-hR;
+    const tip=`${d} — total ${fmt(tot)} pç · antecipado ${fmt(ant)}${tot?` (${Math.round(ant/tot*100)}%)`:""}`;
+    s+=`<g><title>${esc(tip)}</title>`;
+    if(hA) s+=`<rect x="${x}" y="${yA}" width="${bw}" height="${hA}" rx="2" fill="#FFAD33"/>`;
+    if(hR) s+=`<rect x="${x}" y="${yR}" width="${bw}" height="${hR}" rx="2" fill="#7A7A7A"/>`;
+    s+=`<text x="${x+bw/2}" y="${(hA||hR? Math.min(yA,yR):padT+H)-5}" text-anchor="middle" font-size="8.5" font-family="IBM Plex Mono,monospace" fill="var(--txt2)">${fmt(tot)}</text>`;
+    s+=`<text x="${x+bw/2}" y="${padT+H+13}" text-anchor="middle" font-size="8.5" font-family="IBM Plex Mono,monospace" fill="var(--txt2)">${esc(d.slice(0,5))}</text></g>`;
+  });
+  s+=`</svg>`;
+  el1.innerHTML=s;
+  // 2) desvio por lote (dias úteis, pelo último corte) — barra divergente a partir do zero
+  const lotes=AGG.lotes.map(l=>({lote:l, st:statusFor(l)}))
+    .filter(x=>x.st.desvio!==null&&x.st.desvio!==undefined&&!x.st.foraJanela)
+    .sort((a,b)=>b.st.desvio-a.st.desvio);
+  if(!lotes.length){ el2.innerHTML=`<div class='sec-sub'>Carregue a Programação pra ver o desvio por lote.</div>`; return; }
+  const maxDv=Math.max(1,...lotes.map(x=>Math.abs(x.st.desvio)));
+  const rowH=22, labW=90, meio=labW+((el2.clientWidth||760)-labW-40)/2, half=meio-labW-10;
+  const W2=meio+half+40, H2=lotes.length*rowH+10;
+  let g=`<svg viewBox="0 0 ${W2} ${H2}" width="${W2}" height="${H2}" role="img" aria-label="Desvio por lote">`;
+  g+=`<line x1="${meio}" y1="0" x2="${meio}" y2="${H2}" stroke="var(--border)" stroke-width="1"/>`;
+  lotes.forEach((x,i)=>{
+    const y=i*rowH+5, dv=x.st.desvio;
+    const w=Math.round(Math.abs(dv)/maxDv*half);
+    const tip=`${x.lote} — ${x.st.delta||x.st.txt}`;
+    g+=`<g><title>${esc(tip)}</title>`;
+    g+=`<text x="${labW}" y="${y+11}" text-anchor="end" font-size="10" font-family="IBM Plex Mono,monospace" fill="var(--txt)">${esc(x.lote.replace("LT ",""))}</text>`;
+    const dentro = w > half-34;   // barra comprida: o valor entra NELA, senão colide com o rótulo/borda
+    if(dv<0)      g+=`<rect x="${meio-w}" y="${y}" width="${w}" height="14" rx="2" fill="#26A69A"/>`+
+                     (dentro ? `<text x="${meio-w+4}" y="${y+11}" font-size="9" font-family="IBM Plex Mono,monospace" fill="#111">−${-dv}</text>`
+                             : `<text x="${meio-w-5}" y="${y+11}" text-anchor="end" font-size="9" font-family="IBM Plex Mono,monospace" fill="var(--txt2)">−${-dv}</text>`);
+    else if(dv>0) g+=`<rect x="${meio}" y="${y}" width="${w}" height="14" rx="2" fill="#EF5350"/>`+
+                     (dentro ? `<text x="${meio+w-4}" y="${y+11}" text-anchor="end" font-size="9" font-family="IBM Plex Mono,monospace" fill="#111">+${dv}</text>`
+                             : `<text x="${meio+w+5}" y="${y+11}" font-size="9" font-family="IBM Plex Mono,monospace" fill="var(--txt2)">+${dv}</text>`);
+    else          g+=`<rect x="${meio-1}" y="${y}" width="2" height="14" fill="var(--txt2)"/><text x="${meio+6}" y="${y+11}" font-size="9" font-family="IBM Plex Mono,monospace" fill="var(--txt2)">0</text>`;
+    g+=`</g>`;
+  });
+  g+=`</svg>`;
+  el2.innerHTML=g;
+}
+
 // Seção "Invasão de dias": um bloco por dia com dono; embaixo, cada lote invasor com o volume
 function renderInvasao(){
   const t=document.getElementById("tbl-invasao");
@@ -1960,6 +2087,7 @@ function renderKpis(){
   if(fora) cards.push({lbl:"Meta antes do arquivo", val:fora, sub:"não dá pra julgar", cls:"warn"});
   renderPulmao();   // o ranking depende das mesmas datas-meta — redesenha junto com os KPIs
   renderInvasao();  // idem: a invasão depende de quem é o dono de cada dia
+  renderGraficos(); // e os gráficos da Visão geral também
   if(Object.keys(PECA_MAP).length){
     const set=new Set();
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
@@ -1978,6 +2106,7 @@ function renderAll(period){
   fper.title = declaraOutro ? "O “Período de:” do cabeçalho do relatório não bate com as datas das operações — vale o das operações." : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
   renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca(); renderPecaData();
+  aplicaAba();
   if(Object.keys(PROG_MAP).length){
     let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
     setProgInfo(`✓ Programação carregada (${Object.keys(PROG_MAP).length} datas) · ${c} lote(s) com prazo automático.`, false);
@@ -2320,6 +2449,13 @@ function exportPorOperador(){
 }
 
 /* ---------- wire up ---------- */
+// abas: botões montados uma vez; a aba escolhida fica guardada no navegador
+(function(){
+  const nav=document.getElementById("abas");
+  nav.innerHTML=ABAS.map(a=>`<button class='aba-btn' data-aba='${a.id}'>${esc(a.nome)}</button>`).join("");
+  nav.querySelectorAll(".aba-btn").forEach(b=>b.addEventListener("click",()=>setAba(b.dataset.aba)));
+})();
+
 const drop=document.getElementById("drop"), fileInput=document.getElementById("file");
 drop.addEventListener("click",()=>fileInput.click());
 fileInput.addEventListener("change",e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
