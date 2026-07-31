@@ -583,7 +583,11 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <b>antecipado</b> = o invasor cortou antes da própria prevista (lote futuro tomando o dia) · <b>atrasado</b> = rabo de lote que já venceu.
         Dia sem lote previsto na Programação fica fora (não é dia “de ninguém”). Desvios em dias úteis.</div>
       <div class="prazo-actions">
-        <button class="linkbtn" id="btn-print-invasao" style="margin:0" title="Gera um PDF só desta seção">🖶 Imprimir esta seção (PDF)</button>
+        <label class="prog-info ord-lbl">Lote:
+          <select id="inv-lote" class="ord-sel"><option value="">Todos</option></select>
+        </label>
+        <button class="linkbtn" id="btn-print-invasao" style="margin:0" title="Gera um PDF só desta seção (respeita o lote escolhido)">🖶 Imprimir esta seção (PDF)</button>
+        <span id="inv-info" class="prog-info"></span>
       </div>
       <div class="tbl-wrap"><table id="tbl-invasao"></table></div>
     </section>
@@ -2048,9 +2052,33 @@ function renderGraficos(){
 function renderInvasao(){
   const t=document.getElementById("tbl-invasao");
   if(!t||!AGG) return;
-  const dias=invasoesPorDia();
+  // seletor de lote: acompanha os lotes do arquivo, mantendo a escolha
+  const sel=document.getElementById("inv-lote");
+  if(sel && sel.dataset.lotes!==AGG.lotes.join(",")){
+    const v=sel.value;
+    sel.innerHTML="<option value=''>Todos</option>"+AGG.lotes.map(l=>`<option value='${esc(l)}'>${esc(l)}</option>`).join("");
+    sel.value=v; sel.dataset.lotes=AGG.lotes.join(",");
+  }
+  const filtro=sel?sel.value:"";
+  let dias=invasoesPorDia();
+  // filtro por lote: dias em que ELE invadiu (só as linhas dele) + dias em que ele era o
+  // DONO e foi invadido (todas as linhas — quem tomou o dia dele)
+  if(filtro){
+    dias=dias.map(D=>{
+      if(D.donos.some(o=>o.lote===filtro)) return D;
+      const inv=D.invasores.filter(i=>i.lote===filtro);
+      if(!inv.length) return null;
+      return {...D, invasores:inv,
+              qtdInv:inv.reduce((s,i)=>s+i.qtde,0)};   // o "invadido" do dia vira só a parte dele
+    }).filter(Boolean);
+  }
+  const info=document.getElementById("inv-info");
+  if(info) info.textContent = filtro ? `só ${filtro}: dias em que ele invadiu + dias em que o dia era dele` : "";
   if(!dias.length){
-    t.innerHTML=`<tbody><tr><td class='l' style='padding:16px;color:var(--txt2)'>Carregue a <b>Programação</b> (datas previstas) — sem ela não dá pra saber de quem era cada dia.</td></tr></tbody>`;
+    t.innerHTML=`<tbody><tr><td class='l' style='padding:16px;color:var(--txt2)'>${
+      filtro ? `O ${esc(filtro)} não invadiu nenhum dia e nenhum dia dele aparece no arquivo.`
+             : "Carregue a <b>Programação</b> (datas previstas) — sem ela não dá pra saber de quem era cada dia."
+    }</td></tr></tbody>`;
     return;
   }
   let h=`<thead><tr><th class='l'>Dia · dono</th><th>Cortado do dono</th><th>Invadido</th><th>Antecipado</th><th>Atrasado</th><th>% do dia invadido</th></tr></thead><tbody>`;
@@ -2592,6 +2620,9 @@ document.getElementById("btn-pdf").addEventListener("click",()=>{
   setTimeout(volta,1500);
 });
 
+/* filtro de lote da Invasão de dias */
+document.getElementById("inv-lote").addEventListener("change",()=>{ if(AGG) renderInvasao(); });
+
 /* imprimir só a seção Invasão de dias (PDF próprio, com nome de arquivo próprio) */
 document.getElementById("btn-print-invasao").addEventListener("click",()=>{
   const per=document.getElementById("fper").textContent||"";
@@ -2605,7 +2636,8 @@ document.getElementById("btn-print-invasao").addEventListener("click",()=>{
   invasoesPorDia().forEach(D=>D.invasores.forEach(I=>ABERTOS.add("inv:"+D.data+"|"+I.lote)));
   renderInvasao();
   const tituloAntes=document.title;
-  document.title=("Invasão de dias"+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
+  const loteSel=document.getElementById("inv-lote").value;
+  document.title=("Invasão de dias"+(loteSel?" "+loteSel:"")+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
   const volta=()=>{ document.body.classList.remove("modo-invasao"); document.title=tituloAntes;
                     ABERTOS.clear(); abertosAntes.forEach(k=>ABERTOS.add(k)); renderInvasao();
                     window.removeEventListener("afterprint",volta); };
