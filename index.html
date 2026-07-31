@@ -508,6 +508,14 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="pulmao-grid" id="pulmao-grid"></div>
     </section>
 
+    <section id="sec-invasao">
+      <h2>Invasão de dias <span class="tag">quem cortou no dia previsto de outro lote</span></h2>
+      <div class="sec-sub">O <b>dono do dia</b> é o lote com data prevista (MDF ou MDP) naquela data. O que os outros lotes cortaram nesse dia é <b>invasão</b>:
+        <b>antecipado</b> = o invasor cortou antes da própria prevista (lote futuro tomando o dia) · <b>atrasado</b> = rabo de lote que já venceu.
+        Dia sem lote previsto na Programação fica fora (não é dia “de ninguém”). Desvios em dias úteis.</div>
+      <div class="tbl-wrap"><table id="tbl-invasao"></table></div>
+    </section>
+
     <section id="sec-pecadata">
       <h2>Peças cortadas em cada dia <span class="tag">rastreio da data, peça a peça</span></h2>
       <div class="sec-sub">O mesmo rastreio de datas da matriz por lote, só que <b>mostrando a peça</b>: abra um dia e veja
@@ -1158,6 +1166,41 @@ function antecipadoPorDia(list){
   }
   for(const k in dias) dias[k].lotesFut=Object.values(dias[k].dvPorLote).filter(x=>x.max<0).length;
   return dias;
+}
+
+/* ---------- Invasão de dias ----------
+   O DONO do dia é o lote com data prevista (MDF ou MDP) naquela data. Qualquer outro lote
+   cortado nesse dia está INVADINDO o dia do dono — antecipando lote futuro ou arrastando
+   rabo de lote atrasado. Pra cada dia com dono: quanto o dono cortou, quem invadiu e com
+   quantas peças (separando o que era antecipação e o que era atraso, pela prevista do
+   material de cada peça invasora). Dia sem lote previsto não é dia "de ninguém" — fica fora. */
+function invasoesPorDia(){
+  const donos={};                                        // iso -> [{lote, mat}]
+  for(const l of AGG.lotes) for(const m of MATS){
+    const g=getMeta(l,m);
+    if(g.iso) (donos[g.iso]=donos[g.iso]||[]).push({lote:l, mat:m});
+  }
+  const out=[];
+  for(const d of AGG.datas){
+    const iso=cellToISO(d);
+    const own=donos[iso]||[];
+    if(!own.length) continue;
+    const ownSet=new Set(own.map(o=>o.lote));
+    const inv={}; let qtdDono=0, qtdInv=0;
+    for(const r of AGG.recs){
+      if(r.data!==d || !(r.qtde>0)) continue;
+      if(ownSet.has(r.lote)){ qtdDono+=r.qtde; continue; }
+      const I=inv[r.lote]||(inv[r.lote]={lote:r.lote, qtde:0, antes:0, depois:0});
+      I.qtde+=r.qtde; qtdInv+=r.qtde;
+      const mat=materialDaOrdem(r.ordem);
+      const g=getMeta(r.lote, mat||undefined);
+      const pz=isoToDate(g.iso), dd=brToDate(r.data);
+      if(pz&&dd){ if(diasUteisEntre(dd,pz)<0) I.antes+=r.qtde; else I.depois+=r.qtde; }
+    }
+    out.push({data:d, donos:own, qtdDono, qtdInv, tot:qtdDono+qtdInv,
+              invasores:Object.values(inv).sort((a,b)=>b.qtde-a.qtde)});
+  }
+  return out;
 }
 
 // Ranking do pulmão POR LOTE: quanto de cada lote entrou adiantado (antes da data prevista do
@@ -1825,6 +1868,43 @@ function renderPulmao(){
   });
 }
 
+// Seção "Invasão de dias": um bloco por dia com dono; embaixo, cada lote invasor com o volume
+function renderInvasao(){
+  const t=document.getElementById("tbl-invasao");
+  if(!t||!AGG) return;
+  const dias=invasoesPorDia();
+  if(!dias.length){
+    t.innerHTML=`<tbody><tr><td class='l' style='padding:16px;color:var(--txt2)'>Carregue a <b>Programação</b> (datas previstas) — sem ela não dá pra saber de quem era cada dia.</td></tr></tbody>`;
+    return;
+  }
+  let h=`<thead><tr><th class='l'>Dia · dono</th><th>Cortado do dono</th><th>Invadido</th><th>Antecipado</th><th>Atrasado</th><th>% do dia invadido</th></tr></thead><tbody>`;
+  let totInv=0, totDia=0, diasComInvasao=0;
+  for(const D of dias){
+    totInv+=D.qtdInv; totDia+=D.tot; if(D.qtdInv) diasComInvasao++;
+    const donosTxt=D.donos.map(o=>`<span class='mat-tag mat-${o.mat}'>${o.mat}</span><span class='lote-name'>${esc(o.lote)}</span>`).join(" · ");
+    const pct=D.tot?Math.round(D.qtdInv/D.tot*100):0;
+    const sAntes=D.invasores.reduce((s,i)=>s+i.antes,0), sDep=D.invasores.reduce((s,i)=>s+i.depois,0);
+    h+=`<tr class='pd-grp ${D.qtdInv? (pct>=50?"st-red":"st-warn") : "st-ok"}' style='cursor:default'>
+      <td class='l'><span class='pd-dia'>${esc(D.data)}</span> <span class='pd-meta'>dia de</span> ${donosTxt}</td>
+      <td class='num'>${fmt(D.qtdDono)}</td>
+      <td class='num'>${D.qtdInv?fmt(D.qtdInv):"—"}</td>
+      <td class='num ${sAntes?"":"zero"}'>${sAntes?fmt(sAntes):"·"}</td>
+      <td class='num ${sDep?"":"zero"}'>${sDep?fmt(sDep):"·"}</td>
+      <td class='num'>${D.qtdInv?pct+"%":"sem invasão"}</td></tr>`;
+    for(const I of D.invasores){
+      h+=`<tr><td class='l' style='padding-left:30px'>↳ <span class='lote-name'>${esc(I.lote)}</span></td>
+        <td></td><td class='num'>${fmt(I.qtde)}</td>
+        <td class='num ${I.antes?"":"zero"}'>${I.antes?fmt(I.antes):"·"}</td>
+        <td class='num ${I.depois?"":"zero"}'>${I.depois?fmt(I.depois):"·"}</td>
+        <td class='num'>${D.tot?Math.round(I.qtde/D.tot*100)+"%":""}</td></tr>`;
+    }
+  }
+  h+=`<tr class='trtot'><td class='l'>Período: ${diasComInvasao} de ${dias.length} dia(s) com invasão</td>
+    <td>${fmt(totDia-totInv)}</td><td>${fmt(totInv)}</td><td></td><td></td>
+    <td>${totDia?Math.round(totInv/totDia*100)+"%":""}</td></tr></tbody>`;
+  t.innerHTML=h;
+}
+
 function renderKpis(){
   const k=document.getElementById("kpis");
   let atrasados=0, semMeta=0, varios=0, picados=0, fora=0;
@@ -1858,6 +1938,7 @@ function renderKpis(){
   // só aparece se existir: são lotes cujo prazo o painel NÃO consegue julgar com este arquivo
   if(fora) cards.push({lbl:"Meta antes do arquivo", val:fora, sub:"não dá pra julgar", cls:"warn"});
   renderPulmao();   // o ranking depende das mesmas datas-meta — redesenha junto com os KPIs
+  renderInvasao();  // idem: a invasão depende de quem é o dono de cada dia
   if(Object.keys(PECA_MAP).length){
     const set=new Set();
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
@@ -2045,6 +2126,18 @@ function exportCsv(){
         rows.push([O.func, E.cod, E.desc, ordsStr(E.ords), E.lote, E.data, E.qtde, E.dias]);
     }
   }
+  const invs=invasoesPorDia();
+  if(invs.length){
+    rows.push([]);
+    rows.push(["Invasão de dias — quem cortou no dia previsto de outro lote"]);
+    rows.push(["Dia","Dono do dia","Cortado do dono","Lote invasor","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]);
+    for(const D of invs){
+      const dono=D.donos.map(o=>o.mat+" "+o.lote).join(" · ");
+      if(!D.invasores.length){ rows.push([D.data, dono, D.qtdDono, "(sem invasão)", 0, "", "", "0%"]); continue; }
+      for(const I of D.invasores)
+        rows.push([D.data, dono, D.qtdDono, I.lote, I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+    }
+  }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
@@ -2127,6 +2220,18 @@ function exportPorOperador(){
         pa.push([O.func, E.cod, E.desc, ordsStr(E.ords), E.lote, E.data, E.qtde, E.dias]);
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pa), "Pulmão");
+  }
+  // aba "Invasão": quem cortou no dia previsto de outro lote
+  const invx=invasoesPorDia();
+  if(invx.length){
+    const iv=[["Dia","Dono do dia","Cortado do dono","Lote invasor","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]];
+    for(const D of invx){
+      const dono=D.donos.map(o=>o.mat+" "+o.lote).join(" · ");
+      if(!D.invasores.length){ iv.push([D.data, dono, D.qtdDono, "(sem invasão)", 0, "", "", "0%"]); continue; }
+      for(const I of D.invasores)
+        iv.push([D.data, dono, D.qtdDono, I.lote, I.qtde, I.antes, I.depois, D.tot?Math.round(I.qtde/D.tot*100)+"%":""]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(iv), "Invasão");
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
     const aoa=[["Lote","Peça (código)","Peça (descrição)","Ordens","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
