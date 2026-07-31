@@ -168,6 +168,16 @@ td.zero{color:var(--txt3)}
 /* a célula do dia que era a meta do lote fica marcada na coluna dele */
 #tbl-matriz td.cel-meta{box-shadow:inset 0 0 0 1px rgba(255,92,31,.55)}
 
+/* Invasão de dias: as faixas por status e os títulos de dia (os estilos .pd-* são
+   escopados no #tbl-pecadata, então a tabela de invasão precisa dos seus próprios) */
+#tbl-invasao .pd-grp td{border-top:2px solid var(--bg);font-weight:600}
+#tbl-invasao .pd-grp.st-red td{background:rgba(244,67,54,.14)}
+#tbl-invasao .pd-grp.st-warn td{background:rgba(255,152,0,.14)}
+#tbl-invasao .pd-grp.st-ok td{background:rgba(76,175,80,.13)}
+#tbl-invasao .pd-dia{color:var(--acc);font-size:15px;font-family:var(--font-d);font-weight:700}
+#tbl-invasao .pd-meta{font-family:var(--font-d);font-size:10px;color:var(--txt2);
+  font-weight:400;text-transform:uppercase;letter-spacing:1px;margin:0 4px}
+
 /* botão de ocultar lote (Prazo por lote) + chips de reexibir */
 .oc-btn{padding:2px 7px;font-size:10px;margin-left:8px;vertical-align:middle}
 #ocultos-info .linkbtn{padding:2px 8px;font-size:10px;margin-left:4px}
@@ -363,6 +373,14 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #sec-func{break-before:page;page-break-before:always}
   #sec-peca{break-before:page;page-break-before:always}
   #sec-pecadata{break-before:page;page-break-before:always}
+  #sec-invasao{break-before:page;page-break-before:always}
+  #tbl-invasao .pd-grp td{background:#eee !important;color:#111 !important;font-weight:700}
+  #tbl-invasao .pd-dia{color:#111 !important}
+  #tbl-invasao .pd-meta{color:#555 !important}
+  /* modo "só a invasão": imprime o cabeçalho e a seção de invasão, o resto fica fora */
+  body.modo-invasao section:not(#sec-invasao){display:none !important}
+  body.modo-invasao .kpis{display:none !important}
+  body.modo-invasao #sec-invasao{break-before:auto;page-break-before:auto}
   #tbl-peca .peca-lote td{background:#eee !important;color:#111 !important;font-weight:700}
   #tbl-peca .peca-cod{color:#111 !important;font-weight:700}
   #tbl-pecadata .pd-grp td{background:#eee !important;color:#111 !important;font-weight:700}
@@ -513,6 +531,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="sec-sub">O <b>dono do dia</b> é o lote com data prevista (MDF ou MDP) naquela data. O que os outros lotes cortaram nesse dia é <b>invasão</b>:
         <b>antecipado</b> = o invasor cortou antes da própria prevista (lote futuro tomando o dia) · <b>atrasado</b> = rabo de lote que já venceu.
         Dia sem lote previsto na Programação fica fora (não é dia “de ninguém”). Desvios em dias úteis.</div>
+      <div class="prazo-actions">
+        <button class="linkbtn" id="btn-print-invasao" style="margin:0" title="Gera um PDF só desta seção">🖶 Imprimir esta seção (PDF)</button>
+      </div>
       <div class="tbl-wrap"><table id="tbl-invasao"></table></div>
     </section>
 
@@ -2382,6 +2403,22 @@ document.getElementById("btn-pdf").addEventListener("click",()=>{
   const tituloAntes=document.title;
   document.title=("Rastreio do Corte"+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
   const volta=()=>{ document.title=tituloAntes; window.removeEventListener("afterprint",volta); };
+  window.addEventListener("afterprint",volta);
+  window.print();
+  setTimeout(volta,1500);
+});
+
+/* imprimir só a seção Invasão de dias (PDF próprio, com nome de arquivo próprio) */
+document.getElementById("btn-print-invasao").addEventListener("click",()=>{
+  const per=document.getElementById("fper").textContent||"";
+  const n=new Date();
+  const dt=String(n.getDate()).padStart(2,"0")+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getFullYear()).slice(-2)+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  document.getElementById("ph-meta").textContent=(per?per+" · ":"")+"Gerado em "+dt;
+  document.body.classList.add("modo-invasao");
+  const tituloAntes=document.title;
+  document.title=("Invasão de dias"+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
+  const volta=()=>{ document.body.classList.remove("modo-invasao"); document.title=tituloAntes;
+                    window.removeEventListener("afterprint",volta); };
   window.addEventListener("afterprint",volta);
   window.print();
   setTimeout(volta,1500);
