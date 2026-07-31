@@ -1485,11 +1485,17 @@ function fichaDeLote(lote){
 }
 
 // Monta as fichas e chama a impressão do navegador (Salvar como PDF).
+// O navegador sugere o TÍTULO da página como nome do arquivo — então o título vira o lote
+// ("Ficha de corte LT 126-26") enquanto imprime, e volta ao normal depois.
 function imprimirFichas(lotes){
   if(!lotes.length) return;
   document.getElementById("ficha").innerHTML=lotes.map(fichaDeLote).join("");
   document.body.classList.add("modo-ficha");
-  const limpa=()=>{ document.body.classList.remove("modo-ficha"); window.removeEventListener("afterprint",limpa); };
+  const tituloAntes=document.title;
+  document.title=(lotes.length===1 ? "Ficha de corte "+lotes[0] : "Fichas de corte - "+lotes.length+" lotes")
+                 .replace(/\//g,"-");    // "/" não vale em nome de arquivo
+  const limpa=()=>{ document.body.classList.remove("modo-ficha"); document.title=tituloAntes;
+                    window.removeEventListener("afterprint",limpa); };
   window.addEventListener("afterprint",limpa);
   window.print();
   setTimeout(limpa,1500);   // navegador que não dispara afterprint não deixa a tela travada
@@ -2229,7 +2235,13 @@ document.getElementById("btn-pdf").addEventListener("click",()=>{
   const n=new Date();
   const dt=String(n.getDate()).padStart(2,"0")+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getFullYear()).slice(-2)+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
   document.getElementById("ph-meta").textContent=(per?per+" · ":"")+"Gerado em "+dt;
+  // nome sugerido do PDF: relatório + período dos dados
+  const tituloAntes=document.title;
+  document.title=("Rastreio do Corte"+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
+  const volta=()=>{ document.title=tituloAntes; window.removeEventListener("afterprint",volta); };
+  window.addEventListener("afterprint",volta);
   window.print();
+  setTimeout(volta,1500);
 });
 
 /* clock */
