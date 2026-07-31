@@ -433,6 +433,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <b>O status compara só datas</b> (data do último corte × data programada) — ele <b>não sabe se o lote foi cortado por inteiro</b>.
         🟢 <b>Adiantado</b> = o último corte foi <b>antes</b> da meta · 🟢 <b>No dia</b> · 🔴 <b>Atrasado</b> = foi depois ·
         🟡 <b>Em andamento</b> = ainda não teve corte e a meta não venceu. "Adiantado" quer dizer que não houve corte depois da meta, e não que o lote está concluído.
+        <b>Todos os desvios são em dias úteis</b> — sábado e domingo não contam (feriado conta, o painel não tem o calendário da fábrica).
         A coluna <b>“Dias de corte”</b> mostra se o lote saiu de uma vez ou foi <b>picado em vários dias</b>, com quanto saiu em cada um.
         <b>“parou N”</b> quer dizer que, entre o primeiro e o último corte do lote, teve <b>N dias em que a fábrica cortou outras coisas e esse lote não andou</b> (fim de semana e feriado não contam).</div>
       <div class="prazo-actions">
@@ -493,7 +494,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <section id="sec-pulmao">
       <h2>Ranking do pulmão <span class="tag">quem mais antecipou</span></h2>
       <div class="sec-sub">Peças cortadas <b>antes da data prevista do material</b> — corte de lote futuro, que vai pro pulmão em vez de fechar o lote do dia.
-        <b>Lotes</b> que mais entraram adiantados (média = quantos dias antes, ponderado por peça), <b>dias</b> em que a máquina mais cortou lote futuro
+        <b>Lotes</b> que mais entraram adiantados (média = quantos <b>dias úteis</b> antes, ponderado por peça), <b>dias</b> em que a máquina mais cortou lote futuro
         e <b>operadores</b> com mais corte antecipado — “% do que cortou” é a fatia da produção do operador que era lote futuro.
         A sequência em geral vem do sequenciamento, então o ranking por operador serve pra achar <b>onde</b> a antecipação acontece, não culpado.</div>
       <div class="pulmao-grid" id="pulmao-grid"></div>
@@ -612,6 +613,16 @@ function brToDate(s){
 function isoToDate(s){ if(!s) return null; const [y,mo,d]=s.split("-").map(Number); return new Date(y,mo-1,d,12,0,0); }
 function dateToBR(d){ if(!d) return "—"; return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(-2); }
 function daysBetween(a,b){ return Math.round((a-b)/86400000); }
+// Diferença em DIAS ÚTEIS (a − b), pulando sábado e domingo. É a régua de TODOS os desvios
+// contra a data prevista: cortar na sexta um lote previsto pra segunda é 1 dia útil antes,
+// não 3 dias corridos. (Feriado não é descontado — o painel não tem o calendário da fábrica.)
+function diasUteisEntre(a,b){
+  if(!a||!b) return 0;
+  const sinal=a>=b?1:-1, ini=sinal>0?b:a, fim=sinal>0?a:b;
+  let n=0; const d=new Date(ini);
+  while(d<fim){ d.setDate(d.getDate()+1); const wd=d.getDay(); if(wd!==0&&wd!==6) n++; }
+  return n*sinal;
+}
 function todayMidday(){ const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate(),12,0,0); }
 // sort lote keys by their numeric part: "LT 129/26"
 function loteNum(k){ const m=String(k).match(/(\d+)\/(\d+)/); return m? (+m[2])*100000 + (+m[1]) : 9e9; }
@@ -949,16 +960,16 @@ function statusFor(lote, mat){
   let cls="b-mute", txt="Sem data", delta="", desvio=null;
   if(prazo){
     if(last){
-      desvio=daysBetween(last,prazo);
-      if(desvio>0)       { cls="b-red";  txt="Atrasado";  delta=desvio+(desvio===1?" dia atrasado":" dias atrasado"); }
+      desvio=diasUteisEntre(last,prazo);
+      if(desvio>0)       { cls="b-red";  txt="Atrasado";  delta=desvio+(desvio===1?" dia útil atrasado":" dias úteis atrasado"); }
       else if(desvio===0){ cls="b-ok";   txt="No dia";    delta="cortado no dia"; }
-      else               { const d=-desvio; cls="b-ok"; txt="Adiantado"; delta=d+(d===1?" dia adiantado":" dias adiantado"); }
+      else               { const d=-desvio; cls="b-ok"; txt="Adiantado"; delta=d+(d===1?" dia útil adiantado":" dias úteis adiantado"); }
     } else if(prazo>=todayMidday()){
-      const d=daysBetween(prazo,todayMidday());
-      cls="b-warn"; txt="Em andamento"; delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia":" dias"));
+      const d=diasUteisEntre(prazo,todayMidday());
+      cls="b-warn"; txt="Em andamento"; delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia útil":" dias úteis"));
     } else {
-      const d=daysBetween(todayMidday(),prazo);
-      cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia":" dias");
+      const d=diasUteisEntre(todayMidday(),prazo);
+      cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia útil":" dias úteis");
     }
   }
   // A meta é anterior ao começo do arquivo? Então o corte que atendeu o prazo pode ter acontecido
@@ -1006,7 +1017,7 @@ function kpisDoLote(lote){
     const g=getMeta(lote, mat||undefined);
     const pz=isoToDate(g.iso), d=brToDate(r.data);
     if(!pz || !d){ semMeta+=r.qtde; continue; }
-    const dv=daysBetween(d,pz);
+    const dv=diasUteisEntre(d,pz);
     tot+=r.qtde; somaDv+=dv*r.qtde;
     if(dv<0) antes+=r.qtde; else if(dv===0) noDia+=r.qtde; else depois+=r.qtde;
     if(minDv===null||dv<minDv) minDv=dv;
@@ -1033,7 +1044,7 @@ function kpiCardsLote(lote){
   const K=kpisDoLote(lote);
   if(!K) return "";
   const clsPrazo = K.pDepois===0?"ok" : K.pDepois<10?"warn":"red";
-  return `<div class='cap'>KPIs do lote — todos os dias do arquivo, peça cobrada contra a data prevista do material dela</div>
+  return `<div class='cap'>KPIs do lote — todos os dias do arquivo, peça cobrada contra a data prevista do material dela · desvios em dias úteis</div>
     <div class='mkpi ${clsPrazo}'><div class='l'>No prazo</div><div class='v'>${K.pNoPrazo}<small>%</small></div><div class='l'>até a data prevista</div></div>
     <div class='mkpi ok'><div class='l'>Adiantado</div><div class='v'>${K.pAntes}<small>%</small></div><div class='l'>${fmt(K.antes)} pç antes</div></div>
     <div class='mkpi'><div class='l'>No dia</div><div class='v'>${K.pNoDia}<small>%</small></div><div class='l'>${fmt(K.noDia)} pç</div></div>
@@ -1103,7 +1114,7 @@ function antecipadoPorDia(list){
     const pz=isoToDate(g.iso), d=brToDate(r.data);
     if(!pz||!d){ D.semMeta+=r.qtde; continue; }
     D.tot+=r.qtde;
-    const dv=daysBetween(d,pz);
+    const dv=diasUteisEntre(d,pz);
     if(dv<0) D.ant+=r.qtde;
     const L=D.dvPorLote[r.lote]||(D.dvPorLote[r.lote]={min:dv,max:dv});
     if(dv<L.min)L.min=dv; if(dv>L.max)L.max=dv;
@@ -1124,7 +1135,7 @@ function antecipadoPorLote(){
     if(!pz||!d) continue;
     const L=map[r.lote]||(map[r.lote]={lote:r.lote, ant:0, tot:0, somaDias:0, maxAdiant:0});
     L.tot+=r.qtde;
-    const dv=daysBetween(d,pz);
+    const dv=diasUteisEntre(d,pz);
     if(dv<0){ L.ant+=r.qtde; L.somaDias+=(-dv)*r.qtde; if(-dv>L.maxAdiant) L.maxAdiant=-dv; }
   }
   return Object.values(map)
@@ -1153,7 +1164,7 @@ function antecipadoPorOperador(){
     const k=r.func||"—";
     const O=map[k]||(map[k]={func:k, ant:0, tot:0, somaDias:0, lotesAnt:new Set()});
     O.tot+=r.qtde;
-    const dv=daysBetween(d,pz);
+    const dv=diasUteisEntre(d,pz);
     if(dv<0){ O.ant+=r.qtde; O.somaDias+=(-dv)*r.qtde; O.lotesAnt.add(r.lote); }
   }
   return Object.values(map)
@@ -1171,7 +1182,7 @@ function antecipadoDoOperador(func){
     const g=getMeta(r.lote, mat||undefined);
     const pz=isoToDate(g.iso), d=brToDate(r.data);
     if(!pz||!d) continue;
-    const dv=daysBetween(d,pz);
+    const dv=diasUteisEntre(d,pz);
     if(dv>=0) continue;
     const p=PECA_MAP[r.ordem];
     const cod=p?p.cod:"—", descP=p?p.desc:"(sem peça — carregue o relatório por Produto)";
@@ -1245,9 +1256,9 @@ function abrirDetalhe(data, lote){
   // situa o dia em relação à meta — é o que explica um corte solto fora da janela do lote
   let sub=`${fmt(tot)} pç · ${pecas.length} peça(s) diferente(s)`;
   if(prazo){
-    const d=daysBetween(brToDate(data), prazo);
+    const d=diasUteisEntre(brToDate(data), prazo);
     sub += ` · data programada do lote ${dateToBR(prazo)}` +
-      (d===0? " — cortado no dia" : d<0? ` — ${-d} dia(s) ANTES da programada` : ` — ${d} dia(s) depois da programada`);
+      (d===0? " — cortado no dia" : d<0? ` — ${-d} dia(s) útil(eis) ANTES da programada` : ` — ${d} dia(s) útil(eis) depois da programada`);
   } else sub += " · lote sem data programada";
   const nld=lotesNoDia(data);
   sub += ` · neste dia a fábrica cortou ${nld} lote${nld===1?"":"s"} diferente${nld===1?"":"s"}`;
@@ -1374,7 +1385,7 @@ function fichaLinha(p, lote){
   const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
   const f=saldoDe(p);
   const sobra=(p.planejado||0)>0 && p.cortado>p.planejado ? p.cortado-p.planejado : 0;
-  const dv=(pz&&ult)?daysBetween(ult,pz):null;
+  const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
   const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
@@ -1439,7 +1450,7 @@ function fichaDeLote(lote){
       <b>Ordem</b> = nº da ordem de produção no sistema — é por ela que se confere qualquer linha no ERP.
       <b>Prevista</b> = data de corte do material na Programação (MDF corta antes — vai pra pintura).
       <b>Realizada</b> = data do <b>último</b> corte da peça; <b>*</b> = a peça saiu em mais de um dia.
-      O desvio ao lado compara com a prevista: <b>−2 d</b> = 2 dias antes · <b>+1 d</b> = 1 dia depois · <b>no dia</b> = na data.
+      O desvio ao lado compara com a prevista, <b>em dias úteis</b> (sábado e domingo não contam): <b>−2 d</b> = 2 dias úteis antes · <b>+1 d</b> = 1 dia útil depois · <b>no dia</b> = na data.
       O <b>Status</b> do lote olha só o último corte — por isso pode dizer “Atrasado” mesmo com quase tudo no prazo;
       o card <b>“No prazo”</b> é a fatia do volume cortado até a prevista.
       <b>Falta</b> = planejado − cortado. <b>OK</b> = espaço pra marcar na máquina ao conferir.
@@ -1489,8 +1500,8 @@ function desvioTag(st){
   const d=st&&st.desvio;
   if(d===null||d===undefined) return "";
   if(d===0) return `<div class='desvio dv-ok' title='cortado no dia programado'>no dia</div>`;
-  return d<0 ? `<div class='desvio dv-ok' title='cortado antes da data programada'>−${-d} d</div>`
-             : `<div class='desvio dv-red' title='cortado depois da data programada'>+${d} d</div>`;
+  return d<0 ? `<div class='desvio dv-ok' title='cortado ${-d} dia(s) útil(eis) antes da data programada'>−${-d} d</div>`
+             : `<div class='desvio dv-red' title='cortado ${d} dia(s) útil(eis) depois da data programada'>+${d} d</div>`;
 }
 
 function renderPeca(){
@@ -1547,7 +1558,7 @@ function renderPeca(){
       const mat=materialDe(p.desc);
       const gm=getMeta(lote, mat||undefined);
       const pzm=isoToDate(gm.iso);
-      const dv=(pzm&&ult)?daysBetween(ult,pzm):null;
+      const dv=(pzm&&ult)?diasUteisEntre(ult,pzm):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
         <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(p.ords))}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
