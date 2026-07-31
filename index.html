@@ -410,6 +410,17 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #tbl-invasao .pd-grp td{background:#eee !important;color:#111 !important;font-weight:700}
   #tbl-invasao .pd-dia{color:#111 !important}
   #tbl-invasao .pd-meta{color:#555 !important}
+  /* invasão no papel: colunas travadas (número nunca sai cortado) e a descrição/ordens quebram linha */
+  #tbl-invasao{table-layout:fixed;width:100%}
+  #tbl-invasao th:nth-child(1){width:46%}
+  #tbl-invasao th:nth-child(2){width:14%}
+  #tbl-invasao th:nth-child(3),#tbl-invasao th:nth-child(4),#tbl-invasao th:nth-child(5),#tbl-invasao th:nth-child(6){width:10%}
+  #tbl-invasao td,#tbl-invasao th{white-space:normal !important;overflow:visible;word-wrap:break-word}
+  #tbl-invasao .pd-lotes{font-size:7.5px;color:#555 !important}
+  /* caixinha "Como ler" que só existe no papel — é ela que explica a folha pro operador */
+  .como-print{border:1px solid #bbb;border-radius:4px;padding:6px 9px;margin-bottom:8px;
+    font-family:var(--font-d);font-size:8.5px;color:#333;line-height:1.6}
+  .como-print b{color:#111}
   /* modo "só a invasão": imprime o cabeçalho e a seção de invasão, o resto fica fora */
   body.modo-invasao section:not(#sec-invasao){display:none !important}
   body.modo-invasao .kpis{display:none !important}
@@ -589,6 +600,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <button class="linkbtn" id="btn-print-invasao" style="margin:0" title="Gera um PDF só desta seção (respeita o lote escolhido)">🖶 Imprimir esta seção (PDF)</button>
         <span id="inv-info" class="prog-info"></span>
       </div>
+      <div class="print-only como-print"><b>Como ler esta folha:</b>
+        cada bloco é um <b>dia</b> e o lote <b>dono</b> dele (o lote que tinha data prevista naquele dia).
+        As linhas <b>↳</b> são os <b>invasores</b>: lotes cortados no dia que era do dono.
+        Em cada peça invasora: o nº da <b>ordem de produção</b> (é por ela que se confere no ERP) e <b>op</b> = operador que cortou.
+        <b>Antecipado</b> = peça cortada antes da própria data prevista (lote futuro — vai pro pulmão) ·
+        <b>Atrasado</b> = rabo de lote que já venceu, comendo o dia de outro.
+        Desvios em dias úteis (sábado e domingo não contam). Listas de ordem longas mostram as primeiras e “+N” — a lista completa sai no Excel.</div>
       <div class="tbl-wrap"><table id="tbl-invasao"></table></div>
     </section>
 
@@ -700,6 +718,13 @@ let PROD_FILES = [];    // [{nome, period, n, novos}] — só p/ mostrar o que j
 const fmt = n => (n||0).toLocaleString("pt-BR");
 // lista de ordens de produção (Set) -> "12345 / 12346" — a chave pra conferir no ERP
 const ordsStr = s => [...(s||[])].sort((a,b)=>a-b).join(" / ");
+// versão curta pra tela/papel: uma peça pode ter DEZENAS de ordens no dia e a lista completa
+// empurrava as colunas pra fora da folha. Mostra as primeiras e resume ("+N"); a lista
+// completa continua no title (passar o mouse) e nos exports CSV/Excel.
+function ordsCurto(s, max){
+  const a=[...(s||[])].sort((x,y)=>x-y); max=max||5;
+  return a.length<=max ? a.join(" / ") : a.slice(0,max).join(" / ")+" +"+(a.length-max);
+}
 // escapa texto vindo do arquivo (nome de funcionário, descrição de lote…) antes de ir pro innerHTML
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function parseBR(x){
@@ -1565,7 +1590,7 @@ function fichaLinha(p, lote){
   const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
-    <td class='l fx-ord'>${[...p.ords].sort((a,b)=>a-b).map(esc).join("<br>")}</td>
+    <td class='l fx-ord'>${(oa=>oa.length<=4?oa.map(esc).join("<br>"):oa.slice(0,4).map(esc).join("<br>")+"<br>+"+(oa.length-4))([...p.ords].sort((a,b)=>a-b))}</td>
     <td>${g.iso?dateToBR(pz):"—"}</td>
     <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
     <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
@@ -1742,7 +1767,7 @@ function renderPeca(){
       const pzm=isoToDate(gm.iso);
       const dv=(pzm&&ult)?diasUteisEntre(ult,pzm):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
-        <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(p.ords))}</span></td>
+        <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(p.ords))}'>ord ${esc(ordsCurto(p.ords))}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
@@ -1841,7 +1866,7 @@ function renderPdDia(t, info, q, match, dia){
     if(!aberto) continue;                              // recolhido: nem monta as linhas
     for(const p of pecas){
       h+=`<tr class='pd-item' data-grp='${esc(chave)}'>
-        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(p.ords))}</span></td>
+        <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(p.ords))}'>ord ${esc(ordsCurto(p.ords))}</span></td>
         <td class='l'><span class='lote-name'>${esc(p.lote)}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
@@ -2105,7 +2130,7 @@ function renderInvasao(){
         <td class='num'>${D.tot?Math.round(I.qtde/D.tot*100)+"%":""}</td></tr>`;
       if(!aberto) continue;
       for(const P of pecasDaInvasao(D.data, I.lote)){
-        h+=`<tr><td class='l' style='padding-left:52px'><span class='mono peca-cod'>${esc(P.cod)}</span> <span style='font-size:12px'>${esc(P.desc)}</span> <span class='pd-lotes' title='Ordem de produção'>ord ${esc(ordsStr(P.ords))}</span></td>
+        h+=`<tr><td class='l' style='padding-left:52px'><span class='mono peca-cod'>${esc(P.cod)}</span> <span style='font-size:12px'>${esc(P.desc)}</span> <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(P.ords))}'>ord ${esc(ordsCurto(P.ords))}</span></td>
           <td class='l' style='font-size:11.5px' title='Operador que cortou'><span class='pd-lotes'>op</span> ${esc([...P.ops].join(", "))}</td>
           <td class='num'>${fmt(P.qtde)}</td>
           <td class='num ${P.antes?"":"zero"}'>${P.antes?fmt(P.antes):"·"}</td>
