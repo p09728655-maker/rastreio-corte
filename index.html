@@ -1122,10 +1122,17 @@ function antecipadoPorLote(){
 // Ranking POR OPERADOR: quanto do que cada um cortou era peça de lote futuro (antes da prevista).
 // Mede onde a antecipação acontece — a sequência em geral vem de cima, então serve pra conversar
 // sobre o sequenciamento com quem opera, não pra apontar culpado.
+// Fora do ranking por APONTAMENTO ERRADO (o corte é real e continua nos totais do lote,
+// mas o operador registrado não é quem cortou — então não entra na lista por operador):
+const OPS_FORA_RANKING=["RAFAELA","LUCAS"];
+function operadorForaDoRanking(nome){
+  const s=String(nome||"").toUpperCase();
+  return OPS_FORA_RANKING.some(n=>s.includes(n));
+}
 function antecipadoPorOperador(){
   const map={};
   for(const r of (AGG?AGG.recs:[])){
-    if(!(r.qtde>0)) continue;
+    if(!(r.qtde>0) || operadorForaDoRanking(r.func)) continue;
     const mat=materialDaOrdem(r.ordem);
     const g=getMeta(r.lote, mat||undefined);
     const pz=isoToDate(g.iso), d=brToDate(r.data);
