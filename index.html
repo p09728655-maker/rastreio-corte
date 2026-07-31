@@ -466,7 +466,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="sec-sub">Peças cortadas em cada dia, por lote — a consolidação que antes era feita na mão.
         Com o relatório por Produto carregado, <b>clique numa quantidade</b> para ver <b>quais peças</b> saíram naquele dia naquele lote
         (e a quantos dias da data programada aquilo foi cortado).
-        A coluna <b>“Lotes no dia”</b> conta <b>quantos lotes diferentes</b> tiveram corte naquela data — é o que mostra a máquina pulando de lote em lote.</div>
+        A coluna <b>“Lotes no dia”</b> conta <b>quantos lotes diferentes</b> tiveram corte naquela data — e quantos deles eram <b>lotes futuros</b> (todo o corte veio antes da data prevista).
+        A coluna <b>“Antecipado (pulmão)”</b> soma as peças cortadas naquele dia <b>antes da data prevista do material delas</b>: é corte de lote futuro,
+        que <b>vai pro pulmão</b> em vez de fechar o lote do dia — o dia pode ter volume alto e mesmo assim o lote programado não terminar.</div>
       <div class="prazo-actions">
         <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Operador:
           <select id="op-filter"><option value="">Todos</option></select>
@@ -1057,12 +1059,39 @@ function lotesNoDia(data, M){
   return m.lotes.filter(l=>(m.mat[data+"|"+l]||0)>0).length;
 }
 
+/* ---------- Antecipação por dia (o que enche o pulmão) ----------
+   Do corte de cada dia, quanto foi peça de LOTE FUTURO: cortada ANTES da data prevista do
+   material dela. É a peça que vai pro pulmão em vez de fechar o lote do dia — o dia pode
+   ter volume alto e mesmo assim não terminar o lote que estava programado.
+   Um lote conta como "futuro" no dia quando TODO o corte dele naquele dia veio antes da
+   prevista (max dv < 0). Peça sem data prevista fica fora da conta (semMeta). */
+function antecipadoPorDia(list){
+  const dias={};
+  for(const r of list){
+    if(!(r.qtde>0)) continue;
+    const D=dias[r.data]||(dias[r.data]={ant:0, tot:0, semMeta:0, dvPorLote:{}});
+    const mat=materialDaOrdem(r.ordem);
+    const g=getMeta(r.lote, mat||undefined);
+    const pz=isoToDate(g.iso), d=brToDate(r.data);
+    if(!pz||!d){ D.semMeta+=r.qtde; continue; }
+    D.tot+=r.qtde;
+    const dv=daysBetween(d,pz);
+    if(dv<0) D.ant+=r.qtde;
+    const L=D.dvPorLote[r.lote]||(D.dvPorLote[r.lote]={min:dv,max:dv});
+    if(dv<L.min)L.min=dv; if(dv>L.max)L.max=dv;
+  }
+  for(const k in dias) dias[k].lotesFut=Object.values(dias[k].dvPorLote).filter(x=>x.max<0).length;
+  return dias;
+}
+
 function renderMatriz(){
   const t=document.getElementById("tbl-matriz");
-  const M = OP_FILTER ? buildMatrix(AGG.recs.filter(r=>r.funcCod===OP_FILTER)) : AGG;
+  const list = OP_FILTER ? AGG.recs.filter(r=>r.funcCod===OP_FILTER) : AGG.recs;
+  const M = OP_FILTER ? buildMatrix(list) : AGG;
+  const ANT = antecipadoPorDia(list);
   let h="<thead><tr><th class='l'>Data</th>";
   for(const l of M.lotes) h+=`<th>${esc(l)}</th>`;
-  h+="<th>Lotes no dia</th><th>Total dia</th></tr>";
+  h+="<th>Lotes no dia</th><th>Antecipado (pulmão)</th><th>Total dia</th></tr>";
   // 2ª linha do cabeçalho: quando cada lote DEVERIA estar cortado (Programação ou data digitada).
   // Fica logo embaixo do LT pra dar pra comparar com os dias em que ele realmente saiu.
   h+="<tr class='trprog'><th class='l'>Prevista MDF / MDP</th>";
@@ -1075,7 +1104,7 @@ function renderMatriz(){
     }).filter(Boolean).join("");
     h+=`<th class='${linhas?"prog-on":"prog-off"}' title='${esc(l)}'>${linhas||"—"}</th>`;
   }
-  h+="<th></th><th></th></tr></thead><tbody>";
+  h+="<th></th><th></th><th></th></tr></thead><tbody>";
   const temPecas=Object.keys(PECA_MAP).length>0;
   for(const d of M.datas){
     h+=`<tr><td class='l num'>${d}</td>`;
@@ -1088,11 +1117,17 @@ function renderMatriz(){
       const attrs = clic ? ` data-d="${esc(d)}" data-l="${esc(l)}" title="Clique para ver quais peças saíram"` : "";
       h+=`<td class="num ${v?"":"zero"}${alvo}${clic?" tem-peca":""}"${attrs}>${v?fmt(v):"·"}</td>`;
     }
-    h+=`<td class='num'>${lotesNoDia(d,M)}</td><td class='num'>${fmt(M.dataT[d])}</td></tr>`;
+    const A=ANT[d]||{ant:0,tot:0,lotesFut:0};
+    const pctAnt=A.tot?Math.round(A.ant/A.tot*100):0;
+    h+=`<td class='num'>${lotesNoDia(d,M)}${A.lotesFut?`<div class='desvio dv-red'>${A.lotesFut} futuro${A.lotesFut===1?"":"s"}</div>`:""}</td>`;
+    h+=`<td class='num ${A.ant?"":"zero"}'>${A.ant?fmt(A.ant)+`<div class='desvio dv-red'>${pctAnt}% do dia</div>`:"·"}</td>`;
+    h+=`<td class='num'>${fmt(M.dataT[d])}</td></tr>`;
   }
+  let totAnt=0, totComMeta=0;
+  for(const k in ANT){ totAnt+=ANT[k].ant; totComMeta+=ANT[k].tot; }
   h+="<tr class='trtot'><td class='l'>Total cortado</td>";
   for(const l of M.lotes) h+=`<td>${fmt(M.loteT[l])}</td>`;
-  h+=`<td>${M.lotes.length}</td><td>${fmt(M.grand)}</td></tr></tbody>`;
+  h+=`<td>${M.lotes.length}</td><td>${fmt(totAnt)}${totComMeta?` (${Math.round(totAnt/totComMeta*100)}%)`:""}</td><td>${fmt(M.grand)}</td></tr></tbody>`;
   t.innerHTML=h;
   // a 2ª linha do cabeçalho gruda logo abaixo da 1ª (altura medida, não chutada)
   const h1=t.querySelector("thead tr").offsetHeight;
@@ -1116,6 +1151,11 @@ function abrirDetalhe(data, lote){
   } else sub += " · lote sem data programada";
   const nld=lotesNoDia(data);
   sub += ` · neste dia a fábrica cortou ${nld} lote${nld===1?"":"s"} diferente${nld===1?"":"s"}`;
+  const A=antecipadoPorDia(AGG.recs)[data];
+  if(A && (A.lotesFut||A.ant)){
+    if(A.lotesFut) sub += `, ${A.lotesFut} deles futuro${A.lotesFut===1?"":"s"}`;
+    if(A.ant) sub += ` · ${fmt(A.ant)} pç antecipadas no dia (${A.tot?Math.round(A.ant/A.tot*100):0}% foi pro pulmão)`;
+  }
   document.getElementById("modal-sub").textContent=sub;
   document.getElementById("modal-kpis").innerHTML=kpiCardsLote(lote);
 
@@ -1563,12 +1603,18 @@ function renderKpis(){
   const porDia=AGG.datas.map(d=>lotesNoDia(d));
   const mediaLotes=porDia.length? porDia.reduce((a,b)=>a+b,0)/porDia.length : 0;
   const maxLotes=porDia.length? Math.max(...porDia) : 0;
+  // quanto do corte do período foi ANTECIPAÇÃO (peça antes da prevista = pulmão)
+  const ANT=antecipadoPorDia(AGG.recs);
+  let totAnt=0, totComMeta=0;
+  for(const k in ANT){ totAnt+=ANT[k].ant; totComMeta+=ANT[k].tot; }
+  const pAnt=totComMeta?Math.round(totAnt/totComMeta*100):0;
   const cards=[
     {lbl:"Total cortado", val:fmt(AGG.grand), sub:"peças", cls:""},
     {lbl:"Lotes", val:AGG.lotes.length, cls:""},
     {lbl:"Funcionários", val:AGG.funcs.length, cls:""},
     {lbl:"Dias no arquivo", val:AGG.datas.length, cls:""},
     {lbl:"Lotes por dia", val:mediaLotes.toLocaleString("pt-BR",{maximumFractionDigits:1}), sub:"média · máx "+maxLotes, cls:""},
+    {lbl:"Antecipado (pulmão)", val:pAnt+"%", sub:fmt(totAnt)+" pç antes da prevista", cls: pAnt>=25?"red":(pAnt>0?"warn":"ok")},
     {lbl:"Lotes em +1 dia", val:varios, sub:varios?("de "+AGG.lotes.length):"", cls:varios?"warn":"ok"},
     {lbl:"Lotes que pararam", val:picados, sub:"no meio", cls:picados?"red":"ok"},
     {lbl:"Lotes atrasados", val:atrasados, cls:atrasados?"red":"ok"},
@@ -1721,10 +1767,12 @@ function handleProduto(file){
 function exportCsv(){
   if(!AGG) return;
   const rows=[];
-  rows.push(["Data", ...AGG.lotes, "Lotes no dia", "Total dia"]);
-  for(const m of MATS) rows.push(["Prevista "+m, ...AGG.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", ""]);
-  for(const d of AGG.datas){ rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), lotesNoDia(d), AGG.dataT[d]]); }
-  rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.lotes.length, AGG.grand]);
+  const ANT=antecipadoPorDia(AGG.recs);
+  let totAnt=0; for(const k in ANT) totAnt+=ANT[k].ant;
+  rows.push(["Data", ...AGG.lotes, "Lotes no dia", "Lotes futuros", "Antecipado (pç antes da prevista)", "Total dia"]);
+  for(const m of MATS) rows.push(["Prevista "+m, ...AGG.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", "", "", ""]);
+  for(const d of AGG.datas){ const A=ANT[d]||{ant:0,lotesFut:0}; rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), lotesNoDia(d), A.lotesFut, A.ant, AGG.dataT[d]]); }
+  rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.lotes.length, "", totAnt, AGG.grand]);
   rows.push([]);
   rows.push(["Lote","Cortado","1º corte","Último corte","Dias de corte","Dias parado no meio","Cortado em cada dia","Prevista MDF","Prevista MDP","Prazo","Status"]);
   for(const l of AGG.lotes){
@@ -1769,24 +1817,27 @@ function exportPorOperador(){
   if(!AGG) return;
   const wb=XLSX.utils.book_new();
   const usados=new Set();
-  function addAba(nome, M, titulo){
+  function addAba(nome, M, titulo, list){
     const aoa=[];
+    const ANT=antecipadoPorDia(list||AGG.recs);
+    let totAnt=0; for(const k in ANT) totAnt+=ANT[k].ant;
     if(titulo){ aoa.push([titulo]); aoa.push([]); }
-    aoa.push(["Data", ...M.lotes, "Lotes no dia", "Total dia"]);
+    aoa.push(["Data", ...M.lotes, "Lotes no dia", "Lotes futuros", "Antecipado (pç antes da prevista)", "Total dia"]);
     // linha com a data prevista de cada lote (Programação/coluna B ou data manual), embaixo da coluna do lote
-    for(const m of MATS) aoa.push(["Prevista "+m, ...M.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", ""]);
-    for(const d of M.datas) aoa.push([d, ...M.lotes.map(l=>M.mat[d+"|"+l]||0), lotesNoDia(d,M), M.dataT[d]]);
-    aoa.push(["Total cortado", ...M.lotes.map(l=>M.loteT[l]), M.lotes.length, M.grand]);
+    for(const m of MATS) aoa.push(["Prevista "+m, ...M.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", "", "", ""]);
+    for(const d of M.datas){ const A=ANT[d]||{ant:0,lotesFut:0}; aoa.push([d, ...M.lotes.map(l=>M.mat[d+"|"+l]||0), lotesNoDia(d,M), A.lotesFut, A.ant, M.dataT[d]]); }
+    aoa.push(["Total cortado", ...M.lotes.map(l=>M.loteT[l]), M.lotes.length, "", totAnt, M.grand]);
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     let nm=String(nome).replace(/[\[\]\*\/\\\?:]/g," ").trim().slice(0,31)||"Plan";
     let base=nm, i=2; while(usados.has(nm)){ nm=(base.slice(0,27)+" "+i).slice(0,31); i++; }
     usados.add(nm); XLSX.utils.book_append_sheet(wb, ws, nm);
   }
-  addAba("Consolidado (Todos)", AGG, null);
+  addAba("Consolidado (Todos)", AGG, null, AGG.recs);
   for(const o of (AGG.ops||[])){
-    const M=buildMatrix(AGG.recs.filter(r=>r.funcCod===o.cod));
+    const doOp=AGG.recs.filter(r=>r.funcCod===o.cod);
+    const M=buildMatrix(doOp);
     const primeiroNome=String(o.nome||"").split(/\s+/)[0]||"";
-    addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""));
+    addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""), doOp);
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
     const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
