@@ -168,6 +168,12 @@ td.zero{color:var(--txt3)}
 /* a célula do dia que era a meta do lote fica marcada na coluna dele */
 #tbl-matriz td.cel-meta{box-shadow:inset 0 0 0 1px rgba(255,92,31,.55)}
 
+/* Ranking do pulmão: duas tabelas lado a lado (lotes × dias) com barrinha de proporção */
+.pulmao-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}
+.rk-tit{font-family:var(--font-d);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt2);margin-bottom:8px}
+.barra{height:3px;background:var(--elevated);border-radius:2px;margin-top:5px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--warn)}
+
 /* desvio embaixo da data realizada: cortou antes (−) ou depois (+) da programada */
 .desvio{font-family:var(--font-d);font-size:9.5px;letter-spacing:.5px;margin-top:2px;font-weight:600}
 .dv-ok{color:var(--ok)} .dv-red{color:var(--red)}
@@ -476,6 +482,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <span id="op-info" class="prog-info"></span>
       </div>
       <div class="tbl-wrap"><table id="tbl-matriz"></table></div>
+    </section>
+
+    <section id="sec-pulmao">
+      <h2>Ranking do pulmão <span class="tag">quem mais antecipou</span></h2>
+      <div class="sec-sub">Peças cortadas <b>antes da data prevista do material</b> — corte de lote futuro, que vai pro pulmão em vez de fechar o lote do dia.
+        À esquerda, os <b>lotes</b> que mais entraram adiantados (média = quantos dias antes, ponderado por peça); à direita, os <b>dias</b> em que a máquina mais cortou lote futuro.</div>
+      <div class="pulmao-grid" id="pulmao-grid"></div>
     </section>
 
     <section id="sec-pecadata">
@@ -1084,6 +1097,26 @@ function antecipadoPorDia(list){
   return dias;
 }
 
+// Ranking do pulmão POR LOTE: quanto de cada lote entrou adiantado (antes da data prevista do
+// material da peça), quantos dias antes em média (ponderado por peça) e o corte mais adiantado.
+function antecipadoPorLote(){
+  const map={};
+  for(const r of (AGG?AGG.recs:[])){
+    if(!(r.qtde>0)) continue;
+    const mat=materialDaOrdem(r.ordem);
+    const g=getMeta(r.lote, mat||undefined);
+    const pz=isoToDate(g.iso), d=brToDate(r.data);
+    if(!pz||!d) continue;
+    const L=map[r.lote]||(map[r.lote]={lote:r.lote, ant:0, tot:0, somaDias:0, maxAdiant:0});
+    L.tot+=r.qtde;
+    const dv=daysBetween(d,pz);
+    if(dv<0){ L.ant+=r.qtde; L.somaDias+=(-dv)*r.qtde; if(-dv>L.maxAdiant) L.maxAdiant=-dv; }
+  }
+  return Object.values(map)
+    .map(L=>({...L, pct:L.tot?Math.round(L.ant/L.tot*100):0, media:L.ant?L.somaDias/L.ant:0}))
+    .sort((a,b)=>b.ant-a.ant || loteNum(a.lote)-loteNum(b.lote));
+}
+
 function renderMatriz(){
   const t=document.getElementById("tbl-matriz");
   const list = OP_FILTER ? AGG.recs.filter(r=>r.funcCod===OP_FILTER) : AGG.recs;
@@ -1591,6 +1624,38 @@ function renderPdMatriz(t, info, q, match, dia){
   return chaves;
 }
 
+// Seção "Ranking do pulmão": lotes que mais entraram adiantados × dias com mais corte de lote futuro
+function renderPulmao(){
+  const el=document.getElementById("pulmao-grid");
+  if(!el||!AGG) return;
+  const temMeta=AGG.lotes.some(l=>getMeta(l).iso);
+  if(!temMeta){ el.innerHTML=`<div class='sec-sub'>Carregue a <b>Programação</b> (datas previstas) para medir a antecipação.</div>`; return; }
+  const lotes=antecipadoPorLote().filter(x=>x.ant>0);
+  if(!lotes.length){ el.innerHTML=`<div class='sec-sub'>Nenhuma peça cortada antes da data prevista — pulmão limpo neste período.</div>`; return; }
+  const ANT=antecipadoPorDia(AGG.recs);
+  const dias=AGG.datas.map(d=>({data:d, ...(ANT[d]||{ant:0,tot:0,lotesFut:0})})).filter(x=>x.ant>0)
+                      .sort((a,b)=>b.ant-a.ant);
+  const maxL=lotes[0].ant, maxD=dias.length?dias[0].ant:1;
+  let hl=`<div class='rk-tit'>Lotes que mais mandaram pro pulmão</div>
+    <div class='tbl-wrap'><table><thead><tr><th class='l'>Lote</th><th>Antecipado</th><th>% do lote</th><th>Média</th><th>Máx</th></tr></thead><tbody>`;
+  for(const L of lotes){
+    hl+=`<tr><td class='l'><span class='lote-name'>${esc(L.lote)}</span><div class='barra'><i style='width:${Math.max(2,Math.round(L.ant/maxL*100))}%'></i></div></td>
+      <td class='num'>${fmt(L.ant)}</td><td class='num'>${L.pct}%</td>
+      <td class='num'>${L.media.toLocaleString("pt-BR",{maximumFractionDigits:1})} d antes</td>
+      <td class='num'>${L.maxAdiant} d</td></tr>`;
+  }
+  hl+=`</tbody></table></div>`;
+  let hd=`<div class='rk-tit'>Dias com mais antecipação</div>
+    <div class='tbl-wrap'><table><thead><tr><th class='l'>Dia</th><th>Antecipado</th><th>% do dia</th><th>Lotes futuros</th></tr></thead><tbody>`;
+  for(const D of dias){
+    hd+=`<tr><td class='l num'>${esc(D.data)}<div class='barra'><i style='width:${Math.max(2,Math.round(D.ant/maxD*100))}%'></i></div></td>
+      <td class='num'>${fmt(D.ant)}</td><td class='num'>${D.tot?Math.round(D.ant/D.tot*100):0}%</td>
+      <td class='num ${D.lotesFut?"":"zero"}'>${D.lotesFut||"·"}</td></tr>`;
+  }
+  hd+=`</tbody></table></div>`;
+  el.innerHTML=`<div>${hl}</div><div>${hd}</div>`;
+}
+
 function renderKpis(){
   const k=document.getElementById("kpis");
   let atrasados=0, semMeta=0, varios=0, picados=0, fora=0;
@@ -1622,6 +1687,7 @@ function renderKpis(){
   ];
   // só aparece se existir: são lotes cujo prazo o painel NÃO consegue julgar com este arquivo
   if(fora) cards.push({lbl:"Meta antes do arquivo", val:fora, sub:"não dá pra julgar", cls:"warn"});
+  renderPulmao();   // o ranking depende das mesmas datas-meta — redesenha junto com os KPIs
   if(Object.keys(PECA_MAP).length){
     const set=new Set();
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
@@ -1782,6 +1848,19 @@ function exportCsv(){
                D.dist.map(x=>x.data+": "+x.qtde).join(" | "),
                ...dts, s.delta, s.txt]);
   }
+  const rk=antecipadoPorLote().filter(x=>x.ant>0);
+  if(rk.length){
+    rows.push([]);
+    rows.push(["Ranking do pulmão — lotes (pç cortadas antes da data prevista do material)"]);
+    rows.push(["Lote","Antecipado (pç)","% do lote","Média (dias antes)","Máx (dias antes)"]);
+    for(const L of rk) rows.push([L.lote, L.ant, L.pct+"%", L.media.toFixed(1).replace(".",","), L.maxAdiant]);
+    const ANT=antecipadoPorDia(AGG.recs);
+    rows.push([]);
+    rows.push(["Dias com mais antecipação"]);
+    rows.push(["Data","Antecipado (pç)","% do dia","Lotes futuros"]);
+    for(const D of AGG.datas.map(d=>({data:d, ...(ANT[d]||{ant:0,tot:0,lotesFut:0})})).filter(x=>x.ant>0).sort((a,b)=>b.ant-a.ant))
+      rows.push([D.data, D.ant, (D.tot?Math.round(D.ant/D.tot*100):0)+"%", D.lotesFut]);
+  }
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
@@ -1838,6 +1917,20 @@ function exportPorOperador(){
     const M=buildMatrix(doOp);
     const primeiroNome=String(o.nome||"").split(/\s+/)[0]||"";
     addAba(o.cod+" "+primeiroNome, M, o.cod+" - "+(o.nome||""), doOp);
+  }
+  // aba "Pulmão": os dois rankings (lotes × dias) — funciona mesmo sem o relatório por Produto
+  const rkx=antecipadoPorLote().filter(x=>x.ant>0);
+  if(rkx.length){
+    const pa=[["Lotes que mais mandaram pro pulmão (pç cortadas antes da data prevista do material)"]];
+    pa.push(["Lote","Antecipado (pç)","% do lote","Média (dias antes)","Máx (dias antes)"]);
+    for(const L of rkx) pa.push([L.lote, L.ant, L.pct+"%", +L.media.toFixed(1), L.maxAdiant]);
+    pa.push([]);
+    pa.push(["Dias com mais antecipação"]);
+    pa.push(["Data","Antecipado (pç)","% do dia","Lotes futuros"]);
+    const ANTx=antecipadoPorDia(AGG.recs);
+    for(const D of AGG.datas.map(d=>({data:d, ...(ANTx[d]||{ant:0,tot:0,lotesFut:0})})).filter(x=>x.ant>0).sort((a,b)=>b.ant-a.ant))
+      pa.push([D.data, D.ant, (D.tot?Math.round(D.ant/D.tot*100):0)+"%", D.lotesFut]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pa), "Pulmão");
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça foi cortada em cada lote
     const aoa=[["Lote","Peça (código)","Peça (descrição)","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]];
