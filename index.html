@@ -168,6 +168,10 @@ td.zero{color:var(--txt3)}
 /* a célula do dia que era a meta do lote fica marcada na coluna dele */
 #tbl-matriz td.cel-meta{box-shadow:inset 0 0 0 1px rgba(255,92,31,.55)}
 
+/* botão de ocultar lote (Prazo por lote) + chips de reexibir */
+.oc-btn{padding:2px 7px;font-size:10px;margin-left:8px;vertical-align:middle}
+#ocultos-info .linkbtn{padding:2px 8px;font-size:10px;margin-left:4px}
+
 /* Ranking do pulmão: duas tabelas lado a lado (lotes × dias) com barrinha de proporção */
 .pulmao-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}
 .rk-tit{font-family:var(--font-d);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt2);margin-bottom:8px}
@@ -437,11 +441,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         🟡 <b>Em andamento</b> = ainda não teve corte e a meta não venceu. "Adiantado" quer dizer que não houve corte depois da meta, e não que o lote está concluído.
         <b>Todos os desvios são em dias úteis</b> — sábado e domingo não contam (feriado conta, o painel não tem o calendário da fábrica).
         A coluna <b>“Dias de corte”</b> mostra se o lote saiu de uma vez ou foi <b>picado em vários dias</b>, com quanto saiu em cada um.
+        O <b>✕</b> ao lado do lote <b>oculta ele do painel inteiro</b> (KPIs, matriz, rankings e exports) — útil pra reposição de lote antigo; os ocultos ficam listados aqui em cima pra reexibir.
         <b>“parou N”</b> quer dizer que, entre o primeiro e o último corte do lote, teve <b>N dias em que a fábrica cortou outras coisas e esse lote não andou</b> (fim de semana e feriado não contam).</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prog" style="margin:0">⇩ Puxar datas da Programação (.xlsx)</button>
         <button class="linkbtn" id="btn-limpar" style="margin:0">Limpar datas manuais</button>
         <span id="prog-info" class="prog-info"></span>
+        <span id="ocultos-info" class="prog-info"></span>
         <input type="file" id="file-prog" accept=".xlsx,.xls" class="hidden">
       </div>
       <div class="tbl-wrap"><table id="tbl-prazo"></table></div>
@@ -587,6 +593,19 @@ try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG
   }
 })();
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
+// Lotes OCULTOS (ex.: reposição de lote antigo que só suja o painel). Sai de TUDO — KPIs,
+// matriz, rankings e exports — e fica listado numa barra pra reexibir. Persiste no navegador.
+const LS_OCULTOS = "rastreioCorte:ocultos";
+let OCULTOS = new Set();
+try{ OCULTOS = new Set(JSON.parse(localStorage.getItem(LS_OCULTOS)||"[]")); }catch(e){ OCULTOS=new Set(); }
+let RAW_RECS = [];    // todas as operações do arquivo, ANTES do filtro de lotes ocultos
+let LAST_PERIOD = ""; // "Período de:" declarado no último arquivo (pra re-renderizar ao ocultar)
+function salvaOcultos(){ try{ localStorage.setItem(LS_OCULTOS, JSON.stringify([...OCULTOS])); }catch(e){} }
+function aplicaOcultos(){
+  if(!RAW_RECS.length) return;
+  AGG = aggregate(RAW_RECS.filter(r=>!OCULTOS.has(r.lote)));
+  renderAll(LAST_PERIOD);
+}
 let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
 let PROD_PERIOD = "";   // "Período de:" do último relatório por Produto — p/ avisar se forem períodos diferentes
 // Dá pra carregar VÁRIOS relatórios por Produto (um por período): os mapas ordem->peça vão se somando.
@@ -1066,7 +1085,7 @@ function renderPrazo(){
     const D=diasDoLote(lote);
     const temMat=materiaisDoLote(lote);
     h+=`<tr>
-      <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
+      <td class='l'><span class='lote-name'>${esc(lote)}</span><button class='linkbtn oc-btn' data-oc='${esc(lote)}' title='Ocultar este lote do painel INTEIRO (KPIs, matriz, rankings e exports) — dá pra reexibir na barra acima'>✕</button>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
       <td class='num ${AGG.loteT[lote]?"":"zero"}'>${fmt(AGG.loteT[lote])}</td>
       <td class='num'>${dateToBR(s.first)}</td>
       <td class='num'>${dateToBR(s.last)}</td>
@@ -1092,6 +1111,22 @@ function renderPrazo(){
       renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
     });
   });
+  // ocultar lote / reexibir — refaz o AGG sem os ocultos e re-renderiza tudo
+  t.querySelectorAll(".oc-btn").forEach(b=>b.addEventListener("click",()=>{
+    OCULTOS.add(b.dataset.oc); salvaOcultos(); aplicaOcultos();
+  }));
+  const oi=document.getElementById("ocultos-info");
+  if(oi){
+    if(OCULTOS.size){
+      oi.innerHTML="Ocultos:"+[...OCULTOS].sort((a,b)=>loteNum(a)-loteNum(b))
+        .map(l=>`<button class='linkbtn oc-volta' data-oc='${esc(l)}' title='Reexibir este lote'>${esc(l)} ↩</button>`).join("")+
+        `<button class='linkbtn' id='oc-todos'>Reexibir todos</button>`;
+      oi.querySelectorAll(".oc-volta").forEach(b=>b.addEventListener("click",()=>{
+        OCULTOS.delete(b.dataset.oc); salvaOcultos(); aplicaOcultos();
+      }));
+      oi.querySelector("#oc-todos").addEventListener("click",()=>{ OCULTOS.clear(); salvaOcultos(); aplicaOcultos(); });
+    } else oi.innerHTML="";
+  }
 }
 
 // quantos lotes DIFERENTES tiveram corte num dia (a métrica que mostra a máquina pulando de lote em lote)
@@ -1868,7 +1903,8 @@ function handleFile(file){
         showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
         return;
       }
-      AGG=aggregate(recs);
+      RAW_RECS=recs; LAST_PERIOD=period;
+      AGG=aggregate(recs.filter(r=>!OCULTOS.has(r.lote)));
       document.getElementById("fname").textContent=file.name;
       document.getElementById("drop").classList.add("hidden");
       document.getElementById("painel").classList.remove("hidden");
