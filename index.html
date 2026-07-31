@@ -1687,7 +1687,9 @@ function applyPeca(prod, file){
   PROD_PERIOD = periodoDosDados(prod.datas) || prod.period || "";
   PROD_FILES.push({nome:file?file.name:"(arquivo)", period:PROD_PERIOD, n:prod.n, novos});
   if(AGG){
-    renderKpis(); renderPeca(); renderPecaData();
+    // renderMatriz também: é ela que liga o clique nas quantidades (abrir as peças do dia/lote) —
+    // sem redesenhar aqui, o clique só aparecia depois de mexer no filtro de operador
+    renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
     const {cob,tot} = diasSemPeca();
     const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
     const per = PROD_PERIOD?` [${PROD_PERIOD}]`:"";
@@ -1700,7 +1702,7 @@ function applyPeca(prod, file){
 function limparPecas(){
   PECA_MAP={}; PROD_FILES=[]; PROD_PERIOD="";
   setProdInfo("Peças carregadas limpas.", false);
-  if(AGG){ renderKpis(); renderPeca(); renderPecaData(); }
+  if(AGG){ renderKpis(); renderMatriz(); renderPeca(); renderPecaData(); }
 }
 function handleProduto(file){
   const rdr=new FileReader();
