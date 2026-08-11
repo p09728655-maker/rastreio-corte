@@ -69,6 +69,13 @@ arrasta o arquivo na tela e o painel monta na hora:
   médio ponderado pelo cortado e a pior peça). O seletor **“Desvio”** escolhe entre **só as peças
   fora da data prevista** (padrão) e **todas**. Botão na seção *Peças* (usa os lotes filtrados na
   tela) e na **matriz** (usa todos os lotes do arquivo).
+- **Filtro de material na matriz** — o seletor **“Material”** (ao lado de *Operador*) deixa a matriz
+  mostrando **só o corte de MDF**, **só o de MDP** ou só o que não diz o material na descrição.
+  Tudo na tela passa a ser daquele material: quantidades, totais, “Lotes no dia”, “Antecipado
+  (pulmão)”, a lista de peças que abre ao clicar numa quantidade e o que você imprimir dali
+  (ficha da coluna e relatório de desvio). Precisa do **relatório por Produto** carregado — é a
+  descrição da peça que diz o material —, e sem ele o seletor fica **desligado** com o aviso, em
+  vez de mostrar uma matriz vazia.
 - **Imprimir a coluna do lote** — na matriz, clicar no **cabeçalho do lote** (o `LT` no topo da
   coluna) imprime a **ficha daquele lote** direto, sem passar pela aba *Peças*.
 - **Todo impresso no mesmo padrão** — relatório, invasão de dias, ficha de corte e desvio por peça
