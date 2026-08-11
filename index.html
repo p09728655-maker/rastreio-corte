@@ -250,9 +250,6 @@ td.zero{color:var(--txt3)}
 #pd-search{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:6px 10px;border-radius:5px;min-width:280px;flex:0 1 340px}
 #pd-search:focus{outline:none;border-color:var(--acc)}
-#pd-mode,.ord-sel{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
-  font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer}
-#pd-mode:focus,.ord-sel:focus{outline:none;border-color:var(--acc)}
 .ord-lbl{display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)}
 #tbl-pecadata .peca-cod{color:var(--acc);font-size:12px;margin-right:4px}
 /* na matriz a coluna da peça é congelada: limita a largura pra sobrar espaço pros dias.
@@ -293,9 +290,13 @@ td.zero{color:var(--txt3)}
 input[type=date]{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
   font-size:12px;padding:5px 8px;border-radius:5px;color-scheme:dark}
 input[type=date]:focus{outline:none;border-color:var(--acc)}
-#op-filter,#mat-filter{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
-  font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer}
-#op-filter:focus,#mat-filter:focus{outline:none;border-color:var(--acc)}
+/* QUALQUER select do painel entra no tema escuro. Isto já foi duas regras iguais listando os
+   selects um a um (#pd-mode/.ord-sel e #op-filter/#mat-filter): select novo nascia com o branco
+   do sistema até alguém lembrar de pôr o id na lista — foi o que pegou os de Ficha, Desvio e Dia.
+   color-scheme:dark leva o tema também pra lista que o navegador abre, não só pra caixa fechada. */
+select{background:var(--elevated);border:.5px solid var(--border);color:var(--txt);font-family:var(--font-d);
+  font-size:12px;padding:5px 8px;border-radius:5px;cursor:pointer;color-scheme:dark}
+select:focus{outline:none;border-color:var(--acc)}
 /* filtro de material ligado: fica aceso, senão dá pra esquecer que a matriz está parcial */
 #mat-filter.on{border-color:var(--acc);color:var(--acc)}
 #mat-filter:disabled{opacity:.5;cursor:not-allowed}
