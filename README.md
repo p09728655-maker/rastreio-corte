@@ -52,6 +52,30 @@ arrasta o arquivo na tela e o painel monta na hora:
   planejado, a coluna Falta mostra o excedente (`+240`) em vez de esconder atrás de um traço. As peças **ainda não cortadas** entram na ficha — são exatamente as que o
   operador precisa ver. O rodapé diz de onde vieram os dados e avisa se houve corte cuja ordem não
   está no relatório por Produto.
+- **Imprimir MDF e MDP separado** — como os dois **cortam em dias diferentes**, o padrão da ficha é
+  **uma folha de MDF e outra de MDP**: cada folha é **fechada em si** (prevista, status, dias de
+  corte, % no prazo, planejado × cortado × falta e subtotais só daquele material) e traz, em
+  destaque, o aviso de **o que ficou na outra folha** — pra ninguém achar que aquela folha é o lote
+  inteiro. O seletor **“Ficha”** (seção *Peças*) escolhe: `MDF e MDP em folhas separadas` (padrão),
+  `Só MDF`, `Só MDP` — é assim que se gera **um PDF de cada** — ou `MDF e MDP na mesma folha` (o
+  formato antigo). Com vários lotes em `separadas`, saem **todas as folhas de MDF primeiro e depois
+  as de MDP**, que é a ordem em que a fábrica corta. Peça sem `MDF`/`MDP` na descrição não some:
+  vai numa folha própria (*Sem material na descrição*). No detalhe de uma célula da matriz os
+  botões **🖶 MDF / 🖶 MDP / 🖶 separado / 🖶 tudo junto** imprimem direto o lote daquela célula.
+- **Desvio por peça (uma lista só)** — a ficha é *por lote*; este é o contrário: **uma folha
+  contínua com as peças de todos os lotes**, cada uma com lote, ordem, material, **prevista ×
+  realizada**, o **desvio em dias úteis**, planejado × cortado × falta — ordenada do **pior atraso
+  pro maior adiantamento**, com resumo no topo (quantas atrasadas / no dia / adiantadas, desvio
+  médio ponderado pelo cortado e a pior peça). O seletor **“Desvio”** escolhe entre **só as peças
+  fora da data prevista** (padrão) e **todas**. Botão na seção *Peças* (usa os lotes filtrados na
+  tela) e na **matriz** (usa todos os lotes do arquivo).
+- **Imprimir a coluna do lote** — na matriz, clicar no **cabeçalho do lote** (o `LT` no topo da
+  coluna) imprime a **ficha daquele lote** direto, sem passar pela aba *Peças*.
+- **Travar uma linha** — nas tabelas largas (matriz **data × lote** e **por funcionário**), clicar
+  numa linha **trava** ela: fica marcada de ponta a ponta e continua marcada enquanto você rola pro
+  lado, então dá pra ir até a coluna do lote lá na direita sem perder de vista de que dia (ou de
+  quem) é aquele número. Clicar de novo destrava; clicar em outra linha muda a marca de lugar. Nos
+  números sublinhados o clique continua abrindo as peças do dia.
 - **Clique numa quantidade da matriz** — abre quais peças saíram naquele dia naquele lote, com
   máquina e operador, e diz **a quantos dias da data programada** aquilo foi cortado (serve pra
   explicar corte solto fora da janela do lote, tipo aproveitamento de chapa).
@@ -113,3 +137,7 @@ O material de cada peça sai da **descrição** (`... 670X430X15 MDP 2 BRANCO`),
 e cai na data mais tarde do lote. Datas digitadas na mão também são **por material** — a tabela de
 prazo tem um campo pra cada. Dados salvos no formato antigo (uma data só) migram sozinhos para MDP,
 que era a coluna que o painel lia antes.
+
+Como as duas datas caem em dias diferentes, **a ficha de corte sai separada por material** (uma
+folha de MDF e outra de MDP, cada uma com os números só dela) — veja o seletor **“Ficha”** na seção
+*Peças*. As peças sem material na descrição saem numa folha própria em vez de sumirem da impressão.

@@ -129,6 +129,21 @@ tbody tr:hover{background:#191919}
 #tbl-matriz tbody tr:hover td:first-child,#tbl-func tbody tr:hover td:first-child,#tbl-prazo tbody tr:hover td:first-child,
 #tbl-pecadata tbody tr:hover td:first-child,#tbl-pecadata.mx tbody tr:hover td:last-child,
 #tbl-matriz tbody tr:hover td:last-child,#tbl-func tbody tr:hover td:last-child{background:#191919}
+
+/* ---- linha travada (clique na linha) ----
+   Na matriz larga o olho se perde: você acha o número lá na direita e não sabe mais de qual dia
+   ele é. Clicar na linha TRAVA ela — fica marcada de ponta a ponta e assim continua enquanto
+   você rola pro lado. Clicar de novo destrava; clicar em outra linha muda a marca de lugar.
+   (Nos números sublinhados o clique continua abrindo as peças do dia — a marca não atrapalha.) */
+#tbl-matriz tbody tr[data-linha] td,#tbl-func tbody tr[data-linha] td{cursor:pointer}
+#tbl-matriz tbody tr.linha-fixa td,#tbl-func tbody tr.linha-fixa td{
+  background:rgba(255,92,31,.13);border-top:1px solid var(--acc);border-bottom:1px solid var(--acc)}
+#tbl-matriz tbody tr.linha-fixa td:first-child,#tbl-func tbody tr.linha-fixa td:first-child,
+#tbl-matriz tbody tr.linha-fixa td:last-child,#tbl-func tbody tr.linha-fixa td:last-child{
+  background:#3b2416;color:var(--acc);font-weight:700}
+#tbl-matriz tbody tr.linha-fixa td:first-child,#tbl-func tbody tr.linha-fixa td:first-child{
+  box-shadow:inset 3px 0 0 var(--acc),8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-matriz tbody tr.linha-fixa td.tem-peca{color:var(--acc)}
 td.num{font-family:var(--font-d)}
 td.zero{color:var(--txt3)}
 .trtot td{background:var(--elevated);font-weight:700;font-family:var(--font-d);border-top:1px solid var(--border)}
@@ -175,6 +190,12 @@ td.zero{color:var(--txt3)}
 #tbl-peca .peca-lote.st-ok td:first-child{background:#1e2f1f}
 #tbl-peca .peca-lote.st-mute td:first-child{background:var(--elevated)}
 /* matriz: 2ª linha do cabeçalho com a data em que o lote DEVERIA ter sido cortado */
+/* cabeçalho do lote = botão de imprimir a ficha daquela COLUNA (o relatório peça a peça, com
+   prevista × realizada e desvio). A impressora só aparece no hover pra não poluir a tabela. */
+#tbl-matriz th.lote-col{cursor:pointer}
+#tbl-matriz th.lote-col:hover{color:var(--acc)}
+#tbl-matriz th.lote-col .th-pr{opacity:0;font-size:10px}
+#tbl-matriz th.lote-col:hover .th-pr{opacity:1}
 #tbl-matriz .trprog th{text-transform:none;letter-spacing:0;font-size:11px;padding:5px 14px;
   border-bottom:1px solid var(--border);z-index:3}
 #tbl-matriz .trprog th:first-child{font-size:9px;text-transform:uppercase;letter-spacing:1px;z-index:4}
@@ -298,10 +319,16 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 #modal-fundo{position:absolute;inset:0;background:rgba(0,0,0,.72)}
 #modal-cx{position:relative;background:var(--surface);border:.5px solid var(--border);border-radius:10px;
   max-width:900px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+/* com os botões de ficha por material o cabeçalho não cabe mais numa linha só em tela estreita:
+   o título fica com o espaço que sobra e a fileira de botões desce pra linha de baixo */
 #modal-cab{display:flex;align-items:flex-start;gap:16px;padding:16px 18px;border-bottom:.5px solid var(--border);
-  flex-wrap:nowrap}
-#modal-cab>div:first-child{min-width:0}
-#modal-cab .modal-acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:nowrap;align-items:center;flex-shrink:0}
+  flex-wrap:wrap}
+#modal-cab>div:first-child{min-width:0;flex:1 1 380px}
+/* agora são vários botões de ficha (MDF, MDP, separado, junto) — em tela estreita eles quebram
+   linha em vez de espremer o "Fechar" pra fora da caixa */
+#modal-cab .modal-acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;flex-shrink:0}
+#modal-cab .mf-lbl{font-family:var(--font-d);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--txt3)}
+#modal-cab .mf-btn{white-space:nowrap}
 #modal-tit{font-family:var(--font-h);font-size:17px;font-weight:700;color:var(--txt)}
 #modal-sub{font-family:var(--font-d);font-size:11px;color:var(--txt2);margin-top:3px;line-height:1.5}
 /* KPIs do lote dentro do modal: % de desvio, desvio médio em dias, janela */
@@ -355,6 +382,17 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   .fx-cab .fx-logo{height:30px}
   .fx-cab .fx-tit{font-family:var(--font-h);font-weight:700;font-size:20px;color:#111}
   .fx-cab .fx-tit span{color:#FF5C1F}
+  /* etiqueta do material na folha separada: é o que a pessoa lê de longe pra saber se aquela
+     pilha é a do MDF ou a do MDP. Fundo chapado só sai com print-color-adjust:exact. */
+  .fx-cab .fx-tit .fx-mat{display:inline-block;font-family:var(--font-d);font-size:11px;font-weight:700;
+    letter-spacing:1px;padding:2px 8px;border-radius:4px;vertical-align:middle;margin-left:6px;
+    color:#fff !important;background:#333;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fx-cab .fx-tit .fx-mat-MDF{background:#5e35b1}
+  .fx-cab .fx-tit .fx-mat-MDP{background:#00796b}
+  .fx-cab .fx-tit .fx-mat-SEM{background:#616161;font-size:9px}
+  /* aviso de que o lote continua na outra folha — moldura pra não passar batido */
+  #ficha .fx-outras{border:1px solid #111;border-radius:4px;padding:5px 8px;background:#f6f6f6 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .fx-cab .fx-sub{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
   .fx-box{display:flex;gap:8px;margin-bottom:10px}
   .fx-card{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
@@ -549,7 +587,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="sec-sub">Cruza o corte com o relatório <b>“Rel Planilhamento por Produto”</b> (pelo nº da <b>ORDEM</b>) e mostra <b>qual peça foi cortada</b> em cada lote — quanto saiu × o planejado. Carregue os dois relatórios do <b>mesmo período</b>.
         Se o Corte pega vários dias e o Produto só um, <b>carregue um relatório por Produto de cada período</b> — eles vão se somando.
         <b>🖶 Ficha de corte</b>: gera uma folha por lote pra levar na máquina, com a lista de peças, <b>o que ainda falta cortar</b> e espaço pro operador marcar e assinar.
-        A ficha inclui as peças <b>ainda não cortadas</b> (que não aparecem na tabela abaixo).</div>
+        A ficha inclui as peças <b>ainda não cortadas</b> (que não aparecem na tabela abaixo).
+        Como <b>MDF e MDP cortam em dias diferentes</b> (o MDF vai pra pintura antes), a ficha sai <b>separada por material</b>: uma folha de MDF e outra de MDP, cada uma fechada em si
+        (prevista, planejado, cortado e falta só daquele material). No seletor <b>“Ficha”</b> dá pra imprimir <b>só MDF</b> ou <b>só MDP</b> — é assim que se gera <b>um PDF de cada</b> — ou voltar tudo pra mesma folha.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
         <button class="linkbtn" id="btn-prod-limpar" style="margin:0">Limpar peças carregadas</button>
@@ -567,7 +607,22 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
           </select>
         </label>
         <button class="linkbtn" id="peca-toggle" style="margin:0">Expandir tudo</button>
+        <label class="prog-info ord-lbl">Ficha:
+          <select id="ficha-mat" title="MDF e MDP são cortados em dias diferentes — a ficha pode sair separada por material">
+            <option value="sep">MDF e MDP em folhas separadas</option>
+            <option value="MDF">Só MDF (corta antes — pintura)</option>
+            <option value="MDP">Só MDP</option>
+            <option value="junto">MDF e MDP na mesma folha</option>
+          </select>
+        </label>
         <button class="linkbtn" id="btn-fichas" style="margin:0" title="Uma folha por lote, com a lista de peças e o que falta cortar — pra levar na máquina">🖶 Fichas de corte (PDF)</button>
+        <label class="prog-info ord-lbl">Desvio:
+          <select id="desvio-filtro" title="Uma lista só, com as peças de todos os lotes da tela e o desvio de cada uma">
+            <option value="fora">Só as peças fora da data prevista</option>
+            <option value="todas">Todas as peças</option>
+          </select>
+        </label>
+        <button class="linkbtn" id="btn-desvio" style="margin:0" title="UMA lista com as peças de todos os lotes da tela: prevista, realizada e o desvio em dias — não é uma folha por lote">🖶 Desvio por peça (PDF)</button>
         <span id="peca-info" class="prog-info">Clique num lote para abrir as peças.</span>
       </div>
       <div class="tbl-wrap" id="peca-wrap" style="display:none"><table id="tbl-peca"></table></div>
@@ -580,12 +635,15 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         (e a quantos dias da data programada aquilo foi cortado).
         A coluna <b>“Lotes no dia”</b> conta <b>quantos lotes diferentes</b> tiveram corte naquela data — e quantos deles eram <b>lotes futuros</b> (todo o corte veio antes da data prevista).
         A coluna <b>“Antecipado (pulmão)”</b> soma as peças cortadas naquele dia <b>antes da data prevista do material delas</b>: é corte de lote futuro,
-        que <b>vai pro pulmão</b> em vez de fechar o lote do dia — o dia pode ter volume alto e mesmo assim o lote programado não terminar.</div>
+        que <b>vai pro pulmão</b> em vez de fechar o lote do dia — o dia pode ter volume alto e mesmo assim o lote programado não terminar.
+        <b>Clique no cabeçalho do lote</b> (o <b>LT</b> no topo da coluna) para <b>imprimir a ficha daquele lote</b>: é o relatório de <b>todas as peças</b> da coluna — o que já cortou, o que falta, a data prevista, a realizada e o <b>desvio em dias</b> de cada peça (sai separado em MDF e MDP).
+        <b>Clique numa linha</b> (em qualquer lugar fora dos números sublinhados) para <b>travá-la</b>: ela fica marcada de ponta a ponta e continua marcada enquanto você rola pro lado, então dá pra ir até a coluna do lote lá na direita sem perder de vista de que dia é aquele número. Clique de novo para destravar.</div>
       <div class="prazo-actions">
         <label class="prog-info" style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt2)">Operador:
           <select id="op-filter"><option value="">Todos</option></select>
         </label>
         <span id="op-info" class="prog-info"></span>
+        <button class="linkbtn" id="btn-desvio-matriz" style="margin:0" title="UMA lista com as peças de TODOS os lotes da matriz: prevista, realizada e o desvio em dias">🖶 Desvio por peça — todos os lotes (PDF)</button>
       </div>
       <div class="tbl-wrap"><table id="tbl-matriz"></table></div>
     </section>
@@ -652,6 +710,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 
     <section id="sec-func">
       <h2>Por funcionário <span class="tag">quem cortou o quê</span></h2>
+      <div class="sec-sub">Quanto cada funcionário cortou em cada lote. <b>Clique numa linha</b> para <b>travá-la</b> — ela fica marcada de ponta a ponta, pra não se perder na rolagem lateral. Clique de novo para destravar.</div>
       <div class="tbl-wrap"><table id="tbl-func"></table></div>
     </section>
 
@@ -674,7 +733,11 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <div id="modal-cab">
       <div><div id="modal-tit"></div><div id="modal-sub"></div></div>
       <div class="modal-acoes">
-        <button class="linkbtn" id="modal-ficha">Gerar ficha deste lote</button>
+        <span class="mf-lbl">Ficha deste lote:</span>
+        <button class="linkbtn mf-btn" id="modal-ficha-mdf" data-mat="MDF" title="Só as peças de MDF (corta antes — vai pra pintura)">🖶 MDF</button>
+        <button class="linkbtn mf-btn" id="modal-ficha-mdp" data-mat="MDP" title="Só as peças de MDP">🖶 MDP</button>
+        <button class="linkbtn mf-btn" id="modal-ficha" data-mat="sep" title="Uma folha de MDF e outra de MDP">🖶 separado</button>
+        <button class="linkbtn mf-btn" id="modal-ficha-tudo" data-mat="junto" title="MDF e MDP na mesma folha">🖶 tudo junto</button>
         <button class="linkbtn" id="modal-fechar">Fechar ✕</button>
       </div>
     </div>
@@ -786,6 +849,12 @@ const MATS=["MDF","MDP"];
 function materialDe(desc){ const s=String(desc||"").toUpperCase();
   if(/\bMDF\b/.test(s)) return "MDF"; if(/\bMDP\b/.test(s)) return "MDP"; return ""; }
 function materialDaOrdem(ordem){ const p=PECA_MAP[ordem]; return p? materialDe(p.desc) : ""; }
+/* Filtro de material usado pelas fichas, pelos dias e pelos KPIs:
+   "" = tudo · "MDF"/"MDP" = só esse material · "SEM" = peça cuja descrição não diz o material
+   (peça sem material não pode sumir da folha só porque a descrição do ERP veio incompleta). */
+function casaMat(m, filtro){ return !filtro || (filtro==="SEM" ? !m : m===filtro); }
+// rótulo do filtro, do jeito que o operador lê na folha
+function rotuloMat(filtro){ return filtro==="SEM" ? "Sem material na descrição" : (filtro||""); }
 
 // meta efetiva de um lote, POR MATERIAL: manual (digitada) tem prioridade sobre a da Programação.
 // Sem material, devolve a data mais tarde entre as duas (o lote só fecha quando as duas saem).
@@ -1056,6 +1125,14 @@ let AGG=null;
 // (o mesmo produto sempre no mesmo lugar). A outra opção põe a maior quantidade primeiro.
 let PECA_ORD="lote";
 
+/* Como a FICHA DE CORTE sai no papel. O MDF e o MDP do mesmo lote são cortados em dias
+   diferentes (o MDF vai pra pintura antes), então o padrão é folha separada por material:
+   cada operador leva pra máquina só a lista do que vai cortar naquele dia.
+   "sep" = uma folha de MDF e outra de MDP · "MDF"/"MDP" = imprime só esse material
+   (um PDF por vez, quando se quer arquivo separado) · "junto" = tudo na mesma folha. */
+let FICHA_MAT="sep";
+const FICHA_MAT_TXT={sep:"MDF e MDP em folhas separadas", MDF:"só MDF", MDP:"só MDP", junto:"MDF e MDP na mesma folha"};
+
 // Quais grupos estão ABERTOS. Tudo começa recolhido: numa semana cheia são centenas de peças por
 // dia, e a tela viraria uma parede de linhas. As linhas de peça só são montadas quando o grupo
 // abre — assim a tabela fica leve mesmo com muito lote. Chaves: "lote:LT 129/26" / "dia:23/07/26".
@@ -1067,6 +1144,19 @@ function ordenaPecas(list, qtdeDe){
   return list.sort((a,b)=> (loteNum(a.lote||"")-loteNum(b.lote||"")) || porCod(a,b));
 }
 let OP_FILTER="";   // "" = todos; senão = código do operador selecionado na matriz
+
+/* Linha travada de cada tabela larga (matriz por data e por funcionário). Guardada aqui — e não
+   só na classe do <tr> — pra sobreviver ao redesenho (trocar o operador, carregar outro arquivo). */
+const LINHA_FIXA={matriz:"", func:""};
+function travaLinha(tr, tabela){
+  if(!tr) return;
+  const k=tr.dataset.linha||"";
+  const jaEstava = LINHA_FIXA[tabela]===k;
+  LINHA_FIXA[tabela] = jaEstava ? "" : k;
+  const tb=tr.closest("table");
+  if(tb) tb.querySelectorAll("tbody tr.linha-fixa").forEach(x=>x.classList.remove("linha-fixa"));
+  if(!jaEstava) tr.classList.add("linha-fixa");
+}
 
 // datas de corte de um lote — todas, ou só as do material pedido (MDF/MDP)
 function datasDoLote(lote, mat){
@@ -1128,9 +1218,20 @@ function statusFor(lote, mat){
 // Em quantos dias o lote foi cortado, quanto saiu em cada um, e quantos dias ele ficou PARADO no meio.
 // "Parado" conta só dias em que a fábrica cortou alguma coisa (qualquer lote) e esse lote não andou —
 // assim não precisa saber o calendário de trabalho: fim de semana e feriado não viram falsa parada.
-function diasDoLote(lote){
-  const datas = AGG.datas.filter(d=>(AGG.mat[d+"|"+lote]||0)>0);      // AGG.datas já vem ordenado
-  const dist  = datas.map(d=>({data:d, qtde:AGG.mat[d+"|"+lote]}));
+// "filtro" (MDF/MDP/SEM) restringe a contagem às peças daquele material — é o que a folha
+// separada por material precisa mostrar: em que dias o MDF deste lote andou, só ele.
+function diasDoLote(lote, filtro){
+  let porData=null;
+  if(filtro){
+    porData={};
+    for(const r of (AGG?AGG.recs:[])){
+      if(r.lote!==lote || !(r.qtde>0) || !casaMat(materialDaOrdem(r.ordem), filtro)) continue;
+      porData[r.data]=(porData[r.data]||0)+r.qtde;
+    }
+  }
+  const qtdeNoDia = d => porData ? (porData[d]||0) : (AGG.mat[d+"|"+lote]||0);
+  const datas = AGG.datas.filter(d=>qtdeNoDia(d)>0);                  // AGG.datas já vem ordenado
+  const dist  = datas.map(d=>({data:d, qtde:qtdeNoDia(d)}));
   let parados=0;
   if(datas.length>1){
     const ini=brToDate(datas[0]), fim=brToDate(datas[datas.length-1]), set=new Set(datas);
@@ -1149,12 +1250,15 @@ function diasDoLote(lote){
    então cada peça é cobrada contra a data do material dela) e pondera pela quantidade:
    16.191 pç cortadas 3 dias antes pesam mais que 20 pç no dia. Devolve:
    % adiantado / no dia / atrasado, desvio médio em dias (− = antes da prevista) e a
-   janela (do melhor ao pior desvio). null se nenhuma peça do lote tem data prevista. */
-function kpisDoLote(lote){
+   janela (do melhor ao pior desvio). null se nenhuma peça do lote tem data prevista.
+   Com "filtro" (MDF/MDP/SEM) os KPIs valem só para as peças daquele material — é o que sai
+   na folha separada, pra não misturar o desempenho do MDF com o do MDP. */
+function kpisDoLote(lote, filtro){
   let tot=0, antes=0, noDia=0, depois=0, somaDv=0, semMeta=0, minDv=null, maxDv=null;
   for(const r of (AGG?AGG.recs:[])){
     if(r.lote!==lote || !(r.qtde>0)) continue;
     const mat=materialDaOrdem(r.ordem);
+    if(!casaMat(mat, filtro)) continue;
     const g=getMeta(lote, mat||undefined);
     const pz=isoToDate(g.iso), d=brToDate(r.data);
     if(!pz || !d){ semMeta+=r.qtde; continue; }
@@ -1411,7 +1515,10 @@ function renderMatriz(){
   const M = OP_FILTER ? buildMatrix(list) : AGG;
   const ANT = antecipadoPorDia(list);
   let h="<thead><tr><th class='l'>Data</th>";
-  for(const l of M.lotes) h+=`<th>${esc(l)}</th>`;
+  // o cabeçalho do lote é o atalho da COLUNA inteira: imprime a ficha daquele lote (todas as
+  // peças, prevista × realizada e o desvio), que é o relatório que a coluna resume em números
+  for(const l of M.lotes)
+    h+=`<th class='lote-col' data-lote='${esc(l)}' title='Clique para imprimir a ficha do lote ${esc(l)} — todas as peças, o que cortou, a prevista e o desvio em dias'>${esc(l)} <span class='th-pr'>🖶</span></th>`;
   h+="<th title='Quantos lotes diferentes tiveram corte na data · em vermelho, quantos eram lotes futuros'>Lotes no dia</th>"+
      "<th title='Peças cortadas antes da data prevista do material delas — o % é sobre as peças do dia que têm data prevista'>Antecipado (pulmão)</th>"+
      "<th>Total dia</th></tr>";
@@ -1430,7 +1537,8 @@ function renderMatriz(){
   h+="<th></th><th></th><th></th></tr></thead><tbody>";
   const temPecas=Object.keys(PECA_MAP).length>0;
   for(const d of M.datas){
-    h+=`<tr><td class='l num'>${d}</td>`;
+    h+=`<tr data-linha='${esc(d)}'${d===LINHA_FIXA.matriz?" class='linha-fixa'":""}>
+      <td class='l num' title='Clique para travar esta linha (e não se perder ao rolar pro lado)'>${d}</td>`;
     for(const l of M.lotes){
       const v=M.mat[d+"|"+l]||0;
       // marca a célula do dia que era a meta (de qualquer um dos dois materiais)
@@ -1517,7 +1625,8 @@ function renderFunc(){
   for(const l of AGG.lotes) h+=`<th>${esc(l)}</th>`;
   h+="<th>Total</th></tr></thead><tbody>";
   for(const f of AGG.funcs){
-    h+=`<tr><td class='l'>${esc(f)}</td>`;
+    h+=`<tr data-linha='${esc(f)}'${f===LINHA_FIXA.func?" class='linha-fixa'":""}>
+      <td class='l' title='Clique para travar esta linha (e não se perder ao rolar pro lado)'>${esc(f)}</td>`;
     for(const l of AGG.lotes){ const v=AGG.funcLote[f+"|"+l]||0; h+=`<td class='num ${v?"":"zero"}'>${v?fmt(v):"·"}</td>`; }
     h+=`<td class='num'>${fmt(AGG.funcT[f])}</td></tr>`;
   }
@@ -1572,11 +1681,12 @@ function pecaAlertMsg(){
    Lista TODAS as peças que o relatório conhece do lote — inclusive as que ainda não foram
    cortadas (QTDE PROD. = 0) — com planejado, cortado e o que FALTA, mais uma caixinha pro
    operador marcar. É o que tira a desculpa de "não sabia quais peças eram". */
-function pecasDoLote(lote, incluirNaoCortadas){
+function pecasDoLote(lote, incluirNaoCortadas, filtro){
   const L=buildPecaLote()[lote];
   if(!L) return [];
   let lista=Object.values(L.pecas);
   if(!incluirNaoCortadas) lista=lista.filter(p=>p.cortado>0);
+  if(filtro) lista=lista.filter(p=>casaMat(materialDe(p.desc), filtro));
   return ordenaPecas(lista, p=>p.cortado);
 }
 function saldoDe(p){ return Math.max(0, (p.planejado||0)-(p.cortado||0)); }
@@ -1609,9 +1719,17 @@ function fichaLinha(p, lote){
     <td class='ok-box'></td></tr>`;
 }
 
-function fichaDeLote(lote){
-  const pecas=pecasDoLote(lote, true);
-  const st=statusFor(lote), D=diasDoLote(lote), K=kpisDoLote(lote);
+/* filtro: "" = lote inteiro (MDF e MDP na mesma folha, como sempre foi) ·
+   "MDF"/"MDP" = folha só daquele material · "SEM" = folha das peças sem material na descrição.
+   Cada folha é fechada em si: prevista, status, KPIs, subtotais e "falta cortar" são só do
+   material dela — misturar aqui é o que fazia o operador do MDF levar peça de MDP na mão. */
+function fichaDeLote(lote, filtro){
+  filtro = filtro||"";
+  const pecas=pecasDoLote(lote, true, filtro);
+  if(filtro && !pecas.length) return "";        // lote sem esse material: não gera folha vazia
+  // "SEM" não tem data própria na Programação — cai na data do lote (a mais tarde entre MDF e MDP)
+  const matMeta = (filtro && filtro!=="SEM") ? filtro : undefined;
+  const st=statusFor(lote, matMeta), D=diasDoLote(lote, filtro), K=kpisDoLote(lote, filtro);
   const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
   const ag=new Date();
   const impresso=String(ag.getDate()).padStart(2,"0")+"/"+String(ag.getMonth()+1).padStart(2,"0")+"/"+String(ag.getFullYear()).slice(-2)
@@ -1625,7 +1743,13 @@ function fichaDeLote(lote){
   const grupos=MATS.map(m=>({mat:m, lista:pecas.filter(p=>materialDe(p.desc)===m)}))
                    .concat([{mat:"", lista:pecas.filter(p=>!materialDe(p.desc))}])
                    .filter(g=>g.lista.length);
-  const cards=MATS.map(m=>{
+  // o que deste lote NÃO está nesta folha — sai impresso pra ninguém achar que a folha é o lote todo
+  const outras = filtro ? MATS.concat(["SEM"]).filter(m=>m!==filtro).map(m=>{
+      const l=pecasDoLote(lote, true, m);
+      return l.length ? {mat:m, n:l.length, falta:l.reduce((s,p)=>s+saldoDe(p),0)} : null;
+    }).filter(Boolean) : [];
+  const outrasTxt = outras.map(o=>`${o.n} peça(s) ${o.mat==="SEM"?"sem material na descrição":"de "+o.mat}${o.falta?` (falta ${fmt(o.falta)})`:""}`).join(" · ");
+  let cards=(filtro==="SEM" ? [] : (filtro ? [filtro] : MATS)).map(m=>{
     const g=getMeta(lote,m); const sm=statusFor(lote,m);
     const n=pecas.filter(p=>materialDe(p.desc)===m).length;
     if(!n && !g.iso) return "";
@@ -1633,11 +1757,18 @@ function fichaDeLote(lote){
       <div class='v'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</div>
       <div class='l'>${n} peça(s)${sm.delta?" · "+esc(sm.delta):""}</div></div>`;
   }).join("");
+  if(filtro==="SEM"){                      // sem material não tem data própria: vale a do lote
+    const g=getMeta(lote);
+    cards=`<div class='fx-card'><div class='l'>Prevista do lote</div>
+      <div class='v'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</div>
+      <div class='l'>${pecas.length} peça(s) sem MDF/MDP na descrição</div></div>`;
+  }
   return `<div class='fx-pg'>
     <div class='fx-cab'>
       <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
-      <div><div class='fx-tit'>Ficha de corte <span>· ${esc(lote)}</span></div>
+      <div><div class='fx-tit'>Ficha de corte <span>· ${esc(lote)}</span>${filtro?` <span class='fx-mat fx-mat-${esc(filtro)}'>${esc(rotuloMat(filtro))}</span>`:""}</div>
       <div class='fx-sub'>${esc(desc||"—")} · Corte · Patrimar Móveis · Jaci/SP
+        ${filtro?` · folha só de ${esc(rotuloMat(filtro))}${filtro==="MDF"?" (corta antes — vai pra pintura)":""}`:""}
         ${FUNC_PERIOD?` · dados de ${esc(FUNC_PERIOD)}`:""} · impressa em ${impresso}</div></div>
     </div>
     <div class='fx-box'>
@@ -1650,11 +1781,13 @@ function fichaDeLote(lote){
         <div class='l'>desvio médio ${fmtDesvio(K.medio)}</div></div>`:""}
     </div>
     <div class='fx-linha'>
-      Status: <b>${esc(st.txt)}${st.delta?" · "+esc(st.delta):""}</b> (pelo último corte) ·
-      Dias de corte: <b>${D.txt}</b>${D.dist.length?` — ${D.dist.map(x=>{ const n=lotesNoDia(x.data); return esc(x.data)+" "+fmt(x.qtde)+(n>1?` <b>(${n} lotes no dia)</b>`:""); }).join(" · ")}`:""}
+      Status${filtro?` do ${esc(rotuloMat(filtro))}`:""}: <b>${esc(st.txt)}${st.delta?" · "+esc(st.delta):""}</b> (pelo último corte) ·
+      Dias de corte${filtro?` (só ${esc(rotuloMat(filtro))})`:""}: <b>${D.txt}</b>${D.dist.length?` — ${D.dist.map(x=>{ const n=lotesNoDia(x.data); return esc(x.data)+" "+fmt(x.qtde)+(n>1?` <b>(${n} lotes no dia)</b>`:""); }).join(" · ")}`:""}
     </div>
+    ${outrasTxt?`<div class='fx-linha fx-outras'><b>Esta folha é só de ${esc(rotuloMat(filtro))}.</b>
+      O lote ${esc(lote)} ainda tem ${outrasTxt} — sai em folha separada.</div>`:""}
     ${K?`<div class='fx-linha'>
-      Desvio do lote: <b>${K.pAntes}% adiantado · ${K.pNoDia}% no dia · ${K.pDepois}% atrasado</b> ·
+      Desvio ${filtro?"desta folha":"do lote"}: <b>${K.pAntes}% adiantado · ${K.pNoDia}% no dia · ${K.pDepois}% atrasado</b> ·
       desvio médio <b>${fmtDesvio(K.medio)}</b> (− = antes da prevista) ·
       janela <b>${fmtDvInt(K.minDv)} a ${fmtDvInt(K.maxDv)} d</b>${K.semMeta?` · ${fmt(K.semMeta)} pç sem data prevista (fora do %)`:""}
     </div>`:""}
@@ -1684,9 +1817,11 @@ function fichaDeLote(lote){
         <td><b>${fmt(sC)}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
       </tbody></table>`;
     }).join("")}
-    <div class='fx-linha'><b>Total do lote:</b> planejado ${totP?fmt(totP):"—"} · cortado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}</div>
+    <div class='fx-linha'><b>Total ${filtro?`desta folha (${esc(rotuloMat(filtro))})`:"do lote"}:</b> planejado ${totP?fmt(totP):"—"} · cortado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}</div>
     <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
     <div class='fx-nota'>
+      ${filtro?`Esta folha traz <b>só as peças de ${esc(rotuloMat(filtro))}</b> deste lote — planejado, cortado, falta e % são desta folha, não do lote inteiro.
+      O resto do lote sai em outra folha, porque MDF e MDP são cortados em dias diferentes.`:""}
       “Prevista” é a data de corte do material da peça na Programação (MDF e MDP têm datas diferentes: o MDF corta antes porque vai pra pintura).
       “Realizada” é o último corte daquela peça, e ao lado o desvio em dias (− antes da prevista, + depois).
       Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM.
@@ -1699,18 +1834,162 @@ function fichaDeLote(lote){
 // Monta as fichas e chama a impressão do navegador (Salvar como PDF).
 // O navegador sugere o TÍTULO da página como nome do arquivo — então o título vira o lote
 // ("Ficha de corte LT 126-26") enquanto imprime, e volta ao normal depois.
-function imprimirFichas(lotes){
+const nomeLotes = ls => ls.length===1 ? ls[0] : ls.length+" lotes selecionados";
+// aviso curto quando não sobra folha pra imprimir (ex.: "só MDF" num lote que só tem MDP)
+function avisoFicha(msg){
+  showErr(msg);
+  const e=document.getElementById("err");
+  if(e && e.scrollIntoView) e.scrollIntoView({block:"center", behavior:"smooth"});
+}
+function imprimirFichas(lotes, modo){
   if(!lotes.length) return;
-  document.getElementById("ficha").innerHTML=lotes.map(fichaDeLote).join("");
+  modo = modo || FICHA_MAT;
+  // "sep" com vários lotes: todas as folhas de MDF primeiro, depois as de MDP — é a ordem em que
+  // a fábrica corta (MDF vai pra pintura antes), então a pilha já sai separada pra máquina.
+  const paginas=[], usados=new Set();
+  if(modo==="junto"){
+    lotes.forEach(l=>{ paginas.push(fichaDeLote(l,"")); usados.add(l); });
+  } else {
+    const mats = (modo==="sep") ? MATS.concat(["SEM"]) : [modo];
+    mats.forEach(m=>lotes.forEach(l=>{ const p=fichaDeLote(l,m); if(p){ paginas.push(p); usados.add(l); } }));
+  }
+  if(!paginas.length){
+    const alvo=(modo==="MDF"||modo==="MDP") ? " de "+modo : "";
+    avisoFicha(Object.keys(PECA_MAP).length
+      ? `Nenhuma peça${alvo} em ${nomeLotes(lotes)} — nada a imprimir.`
+      : `Pra imprimir a ficha carregue antes o “Rel Planilhamento por Produto” do período (botão na seção Peças) — é ele que diz quais peças são de cada lote.`);
+    return;
+  }
+  document.getElementById("ficha").innerHTML=paginas.join("");
   document.body.classList.add("modo-ficha");
   const tituloAntes=document.title;
-  document.title=(lotes.length===1 ? "Ficha de corte "+lotes[0] : "Fichas de corte - "+lotes.length+" lotes")
+  // o nome do arquivo conta os lotes que REALMENTE renderam folha (pedir "só MDP" de 3 lotes
+  // em que só 2 têm MDP tem que sugerir "2 lotes", senão o PDF sai mentindo no nome)
+  const nomes=[...usados];
+  const sufMat = (modo==="MDF"||modo==="MDP") ? " "+modo : (modo==="sep" ? " MDF e MDP separados" : "");
+  document.title=(nomes.length===1 ? "Ficha de corte "+nomes[0]+sufMat : "Fichas de corte"+sufMat+" - "+nomes.length+" lotes")
                  .replace(/\//g,"-");    // "/" não vale em nome de arquivo
   const limpa=()=>{ document.body.classList.remove("modo-ficha"); document.title=tituloAntes;
                     window.removeEventListener("afterprint",limpa); };
   window.addEventListener("afterprint",limpa);
   window.print();
   setTimeout(limpa,1500);   // navegador que não dispara afterprint não deixa a tela travada
+}
+
+/* ---------- Relatório de desvio, peça a peça (UMA lista, todos os lotes) ----------
+   A ficha é por lote, pra conferir na máquina. Este relatório é o contrário: uma lista só,
+   com TODAS as peças dos lotes que estão na tela, cada uma cobrada contra a data prevista do
+   material dela (MDF corta antes) — pra ver de uma vez tudo que saiu fora da data, sem ficar
+   folheando lote por lote. Ordena pelo PIOR desvio, que é o que interessa achar primeiro. */
+function linhasDesvio(lotes, soFora){
+  const out=[];
+  for(const lote of lotes){
+    for(const p of pecasDoLote(lote, true)){
+      const mat=materialDe(p.desc);
+      const g=getMeta(lote, mat||undefined);
+      const pz=isoToDate(g.iso);
+      const dias=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
+      const ult=dias.length?dias[dias.length-1]:null;
+      const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
+      if(soFora && !(dv!==null && dv!==0)) continue;   // "só fora da prevista": tira o que saiu no dia
+      out.push({lote, p, mat, pz, ult, dv, nDias:dias.length});
+    }
+  }
+  return out.sort((a,b)=>
+    (b.dv===null?-1e9:b.dv)-(a.dv===null?-1e9:a.dv) ||        // pior atraso primeiro
+    loteNum(a.lote)-loteNum(b.lote) ||
+    String(a.p.cod||"").localeCompare(String(b.p.cod||""),"pt-BR",{numeric:true}));
+}
+function relatorioDesvio(lotes, soFora){
+  const L=linhasDesvio(lotes, soFora);
+  if(!L.length) return "";
+  const ag=new Date();
+  const impresso=String(ag.getDate()).padStart(2,"0")+"/"+String(ag.getMonth()+1).padStart(2,"0")+"/"+String(ag.getFullYear()).slice(-2)
+    +" "+String(ag.getHours()).padStart(2,"0")+":"+String(ag.getMinutes()).padStart(2,"0");
+  const atr=L.filter(x=>x.dv>0), adi=L.filter(x=>x.dv<0), noDia=L.filter(x=>x.dv===0), sem=L.filter(x=>x.dv===null);
+  const comDv=L.filter(x=>x.dv!==null);
+  // média ponderada pela quantidade cortada: 16.191 pç 3 dias antes pesam mais que 20 pç no dia
+  let somaQ=0, somaDv=0;
+  for(const x of comDv){ const q=x.p.cortado||0; somaQ+=q; somaDv+=x.dv*q; }
+  const medio = somaQ? somaDv/somaQ : null;
+  const pior = atr.length? atr[0] : null;
+  const totC=L.reduce((s,x)=>s+x.p.cortado,0), totF=L.reduce((s,x)=>s+saldoDe(x.p),0);
+  const lotesLista=[...new Set(L.map(x=>x.lote))];
+  return `<div class='fx-pg'>
+    <div class='fx-cab'>
+      <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
+      <div><div class='fx-tit'>Desvio por peça <span>· ${soFora?"só o que saiu fora da data prevista":"todas as peças"}</span></div>
+      <div class='fx-sub'>Corte · Patrimar Móveis · Jaci/SP · ${lotesLista.length} lote(s)${lotesLista.length<=8?" ("+lotesLista.map(esc).join(", ")+")":""}
+        ${FUNC_PERIOD?` · dados de ${esc(FUNC_PERIOD)}`:""} · impresso em ${impresso}</div></div>
+    </div>
+    <div class='fx-box'>
+      <div class='fx-card ${atr.length?"fx-alerta":""}'><div class='l'>Atrasadas</div><div class='v'>${fmt(atr.length)}</div>
+        <div class='l'>peça(s) depois da prevista</div></div>
+      <div class='fx-card'><div class='l'>No dia</div><div class='v'>${fmt(noDia.length)}</div><div class='l'>peça(s) na data</div></div>
+      <div class='fx-card'><div class='l'>Adiantadas</div><div class='v'>${fmt(adi.length)}</div><div class='l'>peça(s) antes (pulmão)</div></div>
+      <div class='fx-card'><div class='l'>Desvio médio</div><div class='v'>${fmtDesvio(medio)}</div><div class='l'>ponderado pelo cortado</div></div>
+      <div class='fx-card ${pior?"fx-alerta":""}'><div class='l'>Pior atraso</div><div class='v'>${pior?"+"+pior.dv+" d":"—"}</div>
+        <div class='l'>${pior?esc(pior.lote)+" · "+esc(pior.p.cod):"nenhuma peça atrasada"}</div></div>
+      ${sem.length?`<div class='fx-card'><div class='l'>Sem prevista</div><div class='v'>${fmt(sem.length)}</div><div class='l'>lote sem data na Programação</div></div>`:""}
+    </div>
+    <div class='fx-como'><b>Como ler:</b>
+      uma linha por <b>peça</b>, de todos os lotes da lista — não é uma folha por lote.
+      <b>Prevista</b> = data de corte do <b>material da peça</b> na Programação (MDF corta antes — vai pra pintura), por isso duas peças do mesmo lote podem ter previstas diferentes.
+      <b>Realizada</b> = data do <b>último</b> corte da peça; <b>*</b> = ela saiu em mais de um dia.
+      <b>Desvio</b> em <b>dias úteis</b>: <b>+3 d</b> = cortou 3 dias úteis <b>depois</b> da prevista · <b>−2 d</b> = 2 dias <b>antes</b> (foi pro pulmão) · <b>no dia</b> = na data.
+      A lista vem do <b>pior atraso pro maior adiantamento</b>. <b>Falta</b> = planejado − cortado.
+      ${soFora?"Esta folha traz <b>só as peças fora da data prevista</b> — o que saiu no dia certo ficou de fora.":"Esta folha traz <b>todas as peças</b>, inclusive as que saíram no dia certo."}
+    </div>
+    <table><colgroup>
+      <col style='width:74px'><col style='width:74px'><col><col style='width:66px'><col style='width:38px'>
+      <col style='width:62px'><col style='width:62px'><col style='width:50px'>
+      <col style='width:62px'><col style='width:58px'><col style='width:52px'>
+    </colgroup><thead><tr>
+      <th class='l'>Lote</th><th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th><th class='l'>Mat.</th>
+      <th>Prevista</th><th>Realizada</th><th>Desvio</th><th>Planejado</th><th>Cortado</th><th>Falta</th>
+    </tr></thead><tbody>
+    ${L.map(x=>{
+      const f=saldoDe(x.p);
+      const dvTxt = x.dv===null?"—" : x.dv===0?"no dia" : x.dv<0?`−${-x.dv} d`:`+${x.dv} d`;
+      return `<tr class='${x.dv>0?"falta":""}'>
+        <td class='l'>${esc(x.lote)}</td><td class='l'>${esc(x.p.cod)}</td><td class='l'>${esc(x.p.desc)}</td>
+        <td class='l fx-ord'>${esc(ordsCurto(x.p.ords))}</td><td class='l'>${esc(x.mat||"—")}</td>
+        <td>${x.pz?dateToBR(x.pz):"—"}</td>
+        <td>${x.ult?dateToBR(x.ult):"—"}${x.nDias>1?"*":""}</td>
+        <td class='fx-dv ${x.dv>0?"atr":"adi"}'>${dvTxt}</td>
+        <td>${x.p.planejado?fmt(x.p.planejado):"—"}</td><td>${fmt(x.p.cortado)}</td>
+        <td>${f?fmt(f):"—"}</td></tr>`;
+    }).join("")}
+    <tr class='fx-sub'><td class='l' colspan='8'><b>Total — ${fmt(L.length)} peça(s) em ${lotesLista.length} lote(s)</b></td>
+      <td><b>${fmt(L.reduce((s,x)=>s+(x.p.planejado||0),0))}</b></td><td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"—"}</b></td></tr>
+    </tbody></table>
+    <div class='fx-nota'>
+      Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM,
+      e as datas previstas da Programação (MDF e MDP têm datas diferentes). Desvios em dias úteis — sábado e domingo não contam.
+      Peça que não estiver nesses relatórios não entra aqui.
+    </div>
+  </div>`;
+}
+// imprime o relatório de desvio (mesmo caminho da ficha: só ele vai pro papel)
+function imprimirDesvio(lotes, soFora){
+  if(!lotes.length) return;
+  const html=relatorioDesvio(lotes, soFora);
+  if(!html){
+    avisoFicha(Object.keys(PECA_MAP).length
+      ? (soFora ? `Nenhuma peça fora da data prevista em ${nomeLotes(lotes)} — nada a imprimir.`
+                : `Nenhuma peça encontrada em ${nomeLotes(lotes)}.`)
+      : `Pra montar o relatório de desvio carregue antes o “Rel Planilhamento por Produto” do período (botão na seção Peças).`);
+    return;
+  }
+  document.getElementById("ficha").innerHTML=html;
+  document.body.classList.add("modo-ficha");
+  const tituloAntes=document.title;
+  document.title=("Desvio por peça"+(soFora?" - fora da prevista":"")+(FUNC_PERIOD?" "+FUNC_PERIOD:"")).replace(/\//g,"-");
+  const limpa=()=>{ document.body.classList.remove("modo-ficha"); document.title=tituloAntes;
+                    window.removeEventListener("afterprint",limpa); };
+  window.addEventListener("afterprint",limpa);
+  window.print();
+  setTimeout(limpa,1500);
 }
 
 // Etiqueta do desvio embaixo da data realizada: −3 d = cortou 3 dias ANTES da meta; +5 d = depois.
@@ -1766,7 +2045,7 @@ function renderPeca(){
       <td class='num'>${st.mat?`<span class='mat-tag mat-${st.mat}'>${st.mat}</span>`:""}${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
       <td class='num'>${ultBR}${desvioTag(st)}</td>
       <td class='l'><span class='badge ${st.cls}'>${ic} ${esc(pill)}</span></td>
-      <td class='l'><button class='linkbtn fx-btn' data-ficha='${esc(lote)}' title='Ficha deste lote pra levar na máquina'>🖶 ficha</button></td>
+      <td class='l'><button class='linkbtn fx-btn' data-ficha='${esc(lote)}' title='Ficha deste lote pra levar na máquina — ${esc(FICHA_MAT_TXT[FICHA_MAT]||"")}'>🖶 ficha</button></td>
       <td></td></tr>`;
     if(!aberto) continue;                                  // recolhido: nem monta as linhas
     for(const p of pecas){
@@ -1801,7 +2080,8 @@ function renderPeca(){
   });
   const bfx=document.getElementById("btn-fichas");
   if(bfx){ bfx.dataset.lotes=mostrados.join("|");
-    bfx.textContent=`🖶 Fichas de corte (${mostrados.length})`; }
+    bfx.textContent=`🖶 Fichas de corte (${mostrados.length})`;
+    bfx.title=`Uma folha por lote pra levar na máquina — ${FICHA_MAT_TXT[FICHA_MAT]||""}`; }
   const bt=document.getElementById("peca-toggle");
   if(bt){ const tudoAberto=mostrados.length && mostrados.every(l=>ABERTOS.has("lote:"+l));
     bt.textContent = tudoAberto ? "Recolher tudo" : "Expandir tudo";
@@ -2600,6 +2880,12 @@ document.getElementById("btn-prod").addEventListener("click",()=>fileProd.click(
 document.getElementById("btn-prod-limpar").addEventListener("click",limparPecas);
 fileProd.addEventListener("change",e=>{ if(e.target.files[0]) handleProduto(e.target.files[0]); fileProd.value=""; });
 document.getElementById("peca-search").addEventListener("input",()=>{ if(AGG) renderPeca(); });
+/* como a ficha sai no papel: separada por material (padrão), só um material, ou tudo junto */
+const selFichaMat=document.getElementById("ficha-mat");
+if(selFichaMat){
+  selFichaMat.value=FICHA_MAT;
+  selFichaMat.addEventListener("change",e=>{ FICHA_MAT=e.target.value; if(AGG) renderPeca(); });
+}
 
 /* "Peças cortadas em cada dia": busca + modo (lista por dia × matriz data × peça) */
 document.getElementById("pd-search").addEventListener("input",()=>{ if(AGG) renderPecaData(); });
@@ -2623,13 +2909,31 @@ document.getElementById("btn-fichas").addEventListener("click",e=>{
   const ls=(e.target.dataset.lotes||"").split("|").filter(Boolean);
   if(ls.length) imprimirFichas(ls);
 });
+/* relatório de desvio: UMA lista com as peças de todos os lotes (não uma folha por lote) */
+document.getElementById("btn-desvio").addEventListener("click",e=>{
+  const ls=(document.getElementById("btn-fichas").dataset.lotes||"").split("|").filter(Boolean);
+  imprimirDesvio(ls, document.getElementById("desvio-filtro").value==="fora");
+});
+document.getElementById("btn-desvio-matriz").addEventListener("click",()=>{
+  // pela matriz vai o arquivo inteiro: é a leitura da tela toda, coluna por coluna
+  imprimirDesvio(AGG?AGG.lotes:[], document.getElementById("desvio-filtro").value==="fora");
+});
 document.getElementById("tbl-matriz").addEventListener("click",e=>{
+  const th=e.target.closest("th.lote-col");
+  if(th){ imprimirFichas([th.dataset.lote]); return; }          // cabeçalho do lote: ficha da coluna
   const td=e.target.closest("td.tem-peca");
-  if(td) abrirDetalhe(td.dataset.d, td.dataset.l);
+  if(td){ abrirDetalhe(td.dataset.d, td.dataset.l); return; }   // número clicável: abre as peças
+  travaLinha(e.target.closest("tr[data-linha]"), "matriz");     // resto da linha: trava/destrava
+});
+document.getElementById("tbl-func").addEventListener("click",e=>{
+  travaLinha(e.target.closest("tr[data-linha]"), "func");
 });
 document.getElementById("modal-fechar").addEventListener("click",fecharModal);
 document.getElementById("modal-fundo").addEventListener("click",fecharModal);
-document.getElementById("modal-ficha").addEventListener("click",()=>{ const l=MODAL_LOTE; fecharModal(); imprimirFichas([l]); });
+// no modal cada botão diz o material: quem está na máquina do MDF imprime só o MDF
+document.querySelectorAll("#modal .mf-btn").forEach(b=>{
+  b.addEventListener("click",()=>{ const l=MODAL_LOTE; fecharModal(); imprimirFichas([l], b.dataset.mat); });
+});
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") fecharModal(); });
 
 /* ordenação das peças: os dois seletores (seção Peças e seção Dias) mexem no mesmo ajuste */
