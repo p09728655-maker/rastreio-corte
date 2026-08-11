@@ -71,6 +71,12 @@ arrasta o arquivo na tela e o painel monta na hora:
   tela) e na **matriz** (usa todos os lotes do arquivo).
 - **Imprimir a coluna do lote** — na matriz, clicar no **cabeçalho do lote** (o `LT` no topo da
   coluna) imprime a **ficha daquele lote** direto, sem passar pela aba *Peças*.
+- **Todo impresso no mesmo padrão** — relatório, invasão de dias, ficha de corte e desvio por peça
+  saem com o **mesmo cabeçalho dos painéis de PPCP**: faixa escura, tarja *PPCP — Planejamento e
+  Controle da Produção* em âmbar, título em branco e o logo num chip branco. Nas folhas que passam
+  de uma página, a **faixa de identificação** (`LT 130/26 · MDP · prevista 14/07/26 · 18 peça(s)`)
+  e a régua de colunas **se repetem no alto de cada página** — a folha 2 não sai mais como uma
+  tabela solta, sem lote nem material.
 - **Travar uma linha** — nas tabelas largas (matriz **data × lote** e **por funcionário**), clicar
   numa linha **trava** ela: fica marcada de ponta a ponta e continua marcada enquanto você rola pro
   lado, então dá pra ir até a coluna do lote lá na direita sem perder de vista de que dia (ou de

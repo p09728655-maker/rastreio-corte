@@ -378,22 +378,32 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   body.modo-ficha #ficha{display:block !important}
   /* nada de @page aqui: a regra do topo (A4 paisagem) vale pra ficha também — a tabela é larga
      e, em retrato, as datas e a descrição não cabem na mesma linha */
-  .fx-cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:10px}
-  .fx-cab .fx-logo{height:30px}
-  .fx-cab .fx-tit{font-family:var(--font-h);font-weight:700;font-size:20px;color:#111}
-  .fx-cab .fx-tit span{color:#FF5C1F}
+  /* cabeçalho da ficha e do desvio no MESMO padrão do #print-head (painéis de PPCP): faixa
+     escura em degradê, tarja PPCP em âmbar, título em branco e o logo num chip branco. Estas
+     duas folhas eram o que ainda saía fora do padrão — faixa branca com filete laranja,
+     enquanto o relatório e a invasão já iam na faixa escura. */
+  .fx-cab{display:flex;align-items:center;gap:14px;padding:11px 16px;margin-bottom:10px;
+    background:linear-gradient(135deg,#1a1a2e,#16213e 60%,#0f3460);color:#fff;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fx-cab .fx-logo{height:30px;background:#fff;padding:4px 8px;border-radius:4px}
+  .fx-cab .fx-lb{font-family:var(--font-d);font-size:8px;letter-spacing:2px;
+    text-transform:uppercase;color:#f5a623;font-weight:700}
+  .fx-cab .fx-tit{font-family:var(--font-h);font-weight:700;font-size:20px;color:#fff;margin:3px 0 2px}
+  .fx-cab .fx-tit span{color:#a0aec0}
   /* etiqueta do material na folha separada: é o que a pessoa lê de longe pra saber se aquela
-     pilha é a do MDF ou a do MDP. Fundo chapado só sai com print-color-adjust:exact. */
+     pilha é a do MDF ou a do MDP. Fundo chapado só sai com print-color-adjust:exact, e o
+     filete branco garante que o chip se destaque da faixa escura em qualquer impressora. */
   .fx-cab .fx-tit .fx-mat{display:inline-block;font-family:var(--font-d);font-size:11px;font-weight:700;
-    letter-spacing:1px;padding:2px 8px;border-radius:4px;vertical-align:middle;margin-left:6px;
-    color:#fff !important;background:#333;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .fx-cab .fx-tit .fx-mat-MDF{background:#5e35b1}
-  .fx-cab .fx-tit .fx-mat-MDP{background:#00796b}
-  .fx-cab .fx-tit .fx-mat-SEM{background:#616161;font-size:9px}
+    letter-spacing:1px;padding:1px 8px;border-radius:4px;vertical-align:middle;margin-left:6px;
+    border:1px solid #fff;color:#fff !important;background:#333;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fx-cab .fx-tit .fx-mat-MDF{background:#7e57c2}
+  .fx-cab .fx-tit .fx-mat-MDP{background:#00897b}
+  .fx-cab .fx-tit .fx-mat-SEM{background:#78909c;font-size:9px}
   /* aviso de que o lote continua na outra folha — moldura pra não passar batido */
   #ficha .fx-outras{border:1px solid #111;border-radius:4px;padding:5px 8px;background:#f6f6f6 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .fx-cab .fx-sub{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+  .fx-cab .fx-sub{font-family:var(--font-d);font-size:9px;color:#a0aec0;text-transform:uppercase;letter-spacing:1px}
   .fx-box{display:flex;gap:8px;margin-bottom:10px}
   .fx-card{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .fx-card .l{font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#666}
@@ -402,7 +412,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   .fx-linha{font-family:var(--font-d);font-size:9.5px;color:#333;margin-bottom:8px;line-height:1.6}
   .fx-linha b{color:#111}
   /* larguras travadas: os números e as datas caem sempre na mesma coluna, linha a linha */
-  #ficha table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed}
+  #ficha table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;margin-top:9px}
   #ficha th{background:#eee !important;color:#111 !important;border:1px solid #bbb;padding:4px 6px;
     font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
   #ficha th.l,#ficha td.l{text-align:left}
@@ -414,8 +424,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha td.fx-real .fx-dv{display:inline-block;width:38px;text-align:right;margin-left:5px}
   #ficha tr.fx-sub td{background:#f6f6f6 !important;border-top:1.5px solid #999}
   #ficha tr.falta td{background:#fdecea !important;font-weight:700}
-  #ficha .fx-grp{font-family:var(--font-d);font-size:10px;font-weight:700;color:#111;background:#f0f0f0;
-    border:1px solid #bbb;border-bottom:none;padding:4px 6px;margin-top:8px}
+  /* faixa de identificação do grupo. Vive DENTRO do <thead> de propósito: o navegador repete o
+     thead em toda página que a tabela invade, então a folha 2 em diante não sai mais como uma
+     tabela órfã — ela carrega o lote, o material e a data prevista junto. */
+  #ficha thead tr.fx-grp th{font-family:var(--font-d);font-size:10px;font-weight:700;
+    color:#111 !important;background:#f0f0f0 !important;border:1px solid #bbb;padding:4px 6px;
+    text-transform:none;letter-spacing:0}
   #ficha .fx-dv{font-family:var(--font-d);font-size:8px;font-weight:700}
   #ficha .fx-dv.atr{color:#c62828} #ficha .fx-dv.adi{color:#2e7d32}
   #ficha .fx-sobra{color:#e65100;font-weight:700}
@@ -1766,7 +1780,8 @@ function fichaDeLote(lote, filtro){
   return `<div class='fx-pg'>
     <div class='fx-cab'>
       <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
-      <div><div class='fx-tit'>Ficha de corte <span>· ${esc(lote)}</span>${filtro?` <span class='fx-mat fx-mat-${esc(filtro)}'>${esc(rotuloMat(filtro))}</span>`:""}</div>
+      <div><div class='fx-lb'>PPCP — Planejamento e Controle da Produção</div>
+      <div class='fx-tit'>Ficha de corte <span>· ${esc(lote)}</span>${filtro?` <span class='fx-mat fx-mat-${esc(filtro)}'>${esc(rotuloMat(filtro))}</span>`:""}</div>
       <div class='fx-sub'>${esc(desc||"—")} · Corte · Patrimar Móveis · Jaci/SP
         ${filtro?` · folha só de ${esc(rotuloMat(filtro))}${filtro==="MDF"?" (corta antes — vai pra pintura)":""}`:""}
         ${FUNC_PERIOD?` · dados de ${esc(FUNC_PERIOD)}`:""} · impressa em ${impresso}</div></div>
@@ -1803,12 +1818,12 @@ function fichaDeLote(lote, filtro){
     ${grupos.map(gr=>{
       const g=gr.mat?getMeta(lote,gr.mat):{iso:""};
       const sC=gr.lista.reduce((s,p)=>s+p.cortado,0), sP=gr.lista.reduce((s,p)=>s+(p.planejado||0),0), sF=gr.lista.reduce((s,p)=>s+saldoDe(p),0);
-      return `<div class='fx-grp'>${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}
-        ${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</div>
-      <table><colgroup>
+      return `<table><colgroup>
         <col style='width:86px'><col><col style='width:72px'><col style='width:68px'><col style='width:112px'>
         <col style='width:68px'><col style='width:64px'><col style='width:58px'><col style='width:54px'>
-      </colgroup><thead><tr>
+      </colgroup><thead>
+      <tr class='fx-grp'><th class='l' colspan='9'>${esc(lote)} · ${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</th></tr>
+      <tr>
         <th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th>
         <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Cortado</th><th>Falta</th><th class='c'>OK</th>
       </tr></thead><tbody>
@@ -1918,7 +1933,8 @@ function relatorioDesvio(lotes, soFora){
   return `<div class='fx-pg'>
     <div class='fx-cab'>
       <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
-      <div><div class='fx-tit'>Desvio por peça <span>· ${soFora?"só o que saiu fora da data prevista":"todas as peças"}</span></div>
+      <div><div class='fx-lb'>PPCP — Planejamento e Controle da Produção</div>
+      <div class='fx-tit'>Desvio por peça <span>· ${soFora?"só o que saiu fora da data prevista":"todas as peças"}</span></div>
       <div class='fx-sub'>Corte · Patrimar Móveis · Jaci/SP · ${lotesLista.length} lote(s)${lotesLista.length<=8?" ("+lotesLista.map(esc).join(", ")+")":""}
         ${FUNC_PERIOD?` · dados de ${esc(FUNC_PERIOD)}`:""} · impresso em ${impresso}</div></div>
     </div>
@@ -1944,7 +1960,9 @@ function relatorioDesvio(lotes, soFora){
       <col style='width:74px'><col style='width:74px'><col><col style='width:66px'><col style='width:38px'>
       <col style='width:62px'><col style='width:62px'><col style='width:50px'>
       <col style='width:62px'><col style='width:58px'><col style='width:52px'>
-    </colgroup><thead><tr>
+    </colgroup><thead>
+    <tr class='fx-grp'><th class='l' colspan='11'>Desvio por peça · <b>${fmt(L.length)} peça(s)</b> em ${lotesLista.length} lote(s) · ${soFora?"só o que saiu fora da data prevista":"todas as peças"} · do pior atraso pro maior adiantamento</th></tr>
+    <tr>
       <th class='l'>Lote</th><th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th><th class='l'>Mat.</th>
       <th>Prevista</th><th>Realizada</th><th>Desvio</th><th>Planejado</th><th>Cortado</th><th>Falta</th>
     </tr></thead><tbody>
