@@ -62,6 +62,15 @@ arrasta o arquivo na tela e o painel monta na hora:
   as de MDP**, que é a ordem em que a fábrica corta. Peça sem `MDF`/`MDP` na descrição não some:
   vai numa folha própria (*Sem material na descrição*). No detalhe de uma célula da matriz os
   botões **🖶 MDF / 🖶 MDP / 🖶 separado / 🖶 tudo junto** imprimem direto o lote daquela célula.
+- **Desvio por peça (uma lista só)** — a ficha é *por lote*; este é o contrário: **uma folha
+  contínua com as peças de todos os lotes**, cada uma com lote, ordem, material, **prevista ×
+  realizada**, o **desvio em dias úteis**, planejado × cortado × falta — ordenada do **pior atraso
+  pro maior adiantamento**, com resumo no topo (quantas atrasadas / no dia / adiantadas, desvio
+  médio ponderado pelo cortado e a pior peça). O seletor **“Desvio”** escolhe entre **só as peças
+  fora da data prevista** (padrão) e **todas**. Botão na seção *Peças* (usa os lotes filtrados na
+  tela) e na **matriz** (usa todos os lotes do arquivo).
+- **Imprimir a coluna do lote** — na matriz, clicar no **cabeçalho do lote** (o `LT` no topo da
+  coluna) imprime a **ficha daquele lote** direto, sem passar pela aba *Peças*.
 - **Travar uma linha** — nas tabelas largas (matriz **data × lote** e **por funcionário**), clicar
   numa linha **trava** ela: fica marcada de ponta a ponta e continua marcada enquanto você rola pro
   lado, então dá pra ir até a coluna do lote lá na direita sem perder de vista de que dia (ou de
