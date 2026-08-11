@@ -394,11 +394,21 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha .fx-como b{color:#111}
   main{max-width:100% !important;padding:0 !important}
   .print-only{display:block}
-  #print-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #FF5C1F;padding-bottom:8px;margin-bottom:12px}
-  #print-head .ph-logo{height:32px}
-  #print-head .ph-title{font-family:var(--font-h);font-weight:700;font-size:19px;letter-spacing:.5px;color:#111}
-  #print-head .ph-title span{color:#FF5C1F}
-  #print-head .ph-meta{font-family:var(--font-d);font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:3px}
+  /* cabeçalho da folha no padrão dos painéis de PPCP: faixa escura em degradê,
+     tarja PPCP em âmbar, título em branco e o logo num chip branco — o
+     logotipo é vermelho sobre claro e sumiria direto no escuro. O fundo só sai
+     no papel com print-color-adjust:exact; sem ele o navegador economiza tinta,
+     imprime a faixa branca e leva o texto branco junto. */
+  #print-head{display:flex;align-items:center;gap:14px;padding:11px 16px;margin-bottom:12px;
+    background:linear-gradient(135deg,#1a1a2e,#16213e 60%,#0f3460);color:#fff;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print-head .ph-logo{height:30px;background:#fff;padding:4px 8px;border-radius:4px}
+  #print-head .ph-lb{font-family:var(--font-d);font-size:8px;letter-spacing:2px;
+    text-transform:uppercase;color:#f5a623;font-weight:700}
+  #print-head .ph-title{font-family:var(--font-h);font-weight:700;font-size:19px;letter-spacing:.5px;
+    color:#fff;margin:3px 0 2px}
+  #print-head .ph-title span{color:#a0aec0}
+  #print-head .ph-meta{font-family:var(--font-d);font-size:9px;color:#a0aec0;text-transform:uppercase;letter-spacing:1px}
   h2{color:#111 !important;font-size:14px;margin:0 0 6px} h2 .tag{display:none}
   section{margin-bottom:10px} .sec-sub{display:none}
   /* cada tabela larga começa em página nova, sem cortar ao meio */
@@ -488,6 +498,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <div id="print-head" class="print-only">
       <img src="patrimar-logo.png" class="ph-logo" alt="Patrimar" onerror="this.style.display='none'">
       <div class="ph-txt">
+        <div class="ph-lb">PPCP — Planejamento e Controle da Produção</div>
         <div class="ph-title">Rastreio do Corte <span>· Relatório</span></div>
         <div class="ph-meta" id="ph-meta"></div>
       </div>
