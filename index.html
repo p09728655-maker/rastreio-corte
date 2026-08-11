@@ -230,6 +230,8 @@ td.zero{color:var(--txt3)}
 /* desvio embaixo da data realizada: cortou antes (−) ou depois (+) da programada */
 .desvio{font-family:var(--font-d);font-size:9.5px;letter-spacing:.5px;margin-top:2px;font-weight:600}
 .dv-ok{color:var(--ok)} .dv-red{color:var(--red)}
+/* nem verde nem vermelho: o desvio existe no papel mas não é confiável (ver metaForaDaJanela) */
+.dv-fora{color:var(--warn);font-size:8.5px;letter-spacing:0}
 
 /* MDF × MDP: o MDF corta antes (vai pra pintura), então tem data própria na Programação */
 /* largura fixa: com ou sem etiqueta, o código da peça começa sempre na mesma coluna */
@@ -436,6 +438,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     text-transform:none;letter-spacing:0}
   #ficha .fx-dv{font-family:var(--font-d);font-size:8px;font-weight:700}
   #ficha .fx-dv.atr{color:#c62828} #ficha .fx-dv.adi{color:#2e7d32}
+  /* nem vermelho nem verde: o desvio existe mas não é confiável (ver metaForaDaJanela) */
+  #ficha .fx-dv.fora{color:#e65100}
   #ficha .fx-sobra{color:#e65100;font-weight:700}
   #ficha .fx-card .l+.v+.l{margin-top:2px}
   #ficha td.ok-box{width:58px;background:#fff}   /* espaço pro operador marcar de caneta */
@@ -1202,6 +1206,18 @@ function datasDoLote(lote, mat){
 
 // Status de um lote. Sem material: o lote herda o material em pior situação (o MDF tem data
 // própria e corta antes, então cobrar o lote inteiro contra uma data só dá atraso falso).
+/* A meta é anterior ao começo do arquivo? Então o corte que atendeu o prazo pode ter acontecido
+   ANTES do período exportado, e o painel não tem como saber. Dizer "42 dias atrasado" nesse caso
+   é afirmar com dado incompleto — o que aparece no arquivo costuma ser reposição/complemento.
+   Esta é a ÚNICA fonte da regra: antes ela vivia solta dentro do statusFor, então o Prazo por lote
+   se recusava a julgar enquanto a ficha, o desvio por peça e a tabela de peças cravavam "+6 d" no
+   mesmo lote — e ele chegava a ser coroado "pior atraso" numa folha que o painel dizia não saber
+   avaliar. Quem quiser cobrar esses lotes exporta o relatório começando antes da meta deles. */
+function metaForaDaJanela(prazo){
+  if(!prazo) return false;
+  const ini = (AGG && AGG.datas.length) ? brToDate(AGG.datas[0]) : null;
+  return !!(ini && prazo < ini);
+}
 function statusFor(lote, mat){
   if(!mat){
     const ms=materiaisDoLote(lote);
@@ -1234,14 +1250,11 @@ function statusFor(lote, mat){
       cls="b-red"; txt="Não cortado"; delta="venceu há "+d+(d===1?" dia útil":" dias úteis");
     }
   }
-  // A meta é anterior ao começo do arquivo? Então o corte que atendeu o prazo pode ter acontecido
-  // ANTES do período exportado, e o painel não tem como saber. Dizer "42 dias atrasado" nesse caso
-  // é afirmar com dado incompleto — o que aparece aqui costuma ser reposição/complemento do lote.
-  let foraJanela=false;
-  const iniArq = (AGG && AGG.datas.length) ? brToDate(AGG.datas[0]) : null;
-  if(prazo && iniArq && prazo < iniArq){
-    foraJanela=true; cls="b-warn"; txt="Fora da janela";
+  const foraJanela = metaForaDaJanela(prazo);
+  if(foraJanela){
+    cls="b-warn"; txt="Fora da janela";
     delta=`meta ${dateToBR(prazo)} é anterior ao arquivo (começa ${AGG.datas[0]})`;
+    desvio=null;      // não dá pra afirmar desvio aqui — ver metaForaDaJanela()
   }
   return {iso,prazo,first,last,cls,txt,delta,desvio,foraJanela,src:meta.src,mat:mat||meta.mat||""};
 }
@@ -1285,7 +1298,7 @@ function diasDoLote(lote, filtro){
    Com "filtro" (MDF/MDP/SEM) os KPIs valem só para as peças daquele material — é o que sai
    na folha separada, pra não misturar o desempenho do MDF com o do MDP. */
 function kpisDoLote(lote, filtro){
-  let tot=0, antes=0, noDia=0, depois=0, somaDv=0, semMeta=0, minDv=null, maxDv=null;
+  let tot=0, antes=0, noDia=0, depois=0, somaDv=0, semMeta=0, foraJanela=0, minDv=null, maxDv=null;
   for(const r of (AGG?AGG.recs:[])){
     if(r.lote!==lote || !(r.qtde>0)) continue;
     const mat=materialDaOrdem(r.ordem);
@@ -1293,6 +1306,9 @@ function kpisDoLote(lote, filtro){
     const g=getMeta(lote, mat||undefined);
     const pz=isoToDate(g.iso), d=brToDate(r.data);
     if(!pz || !d){ semMeta+=r.qtde; continue; }
+    // meta anterior ao arquivo: fora dos %, senão a folha diz "100% atrasado" sobre um atraso
+    // que ninguém consegue confirmar com este período exportado
+    if(metaForaDaJanela(pz)){ foraJanela+=r.qtde; continue; }
     const dv=diasUteisEntre(d,pz);
     tot+=r.qtde; somaDv+=dv*r.qtde;
     if(dv<0) antes+=r.qtde; else if(dv===0) noDia+=r.qtde; else depois+=r.qtde;
@@ -1303,7 +1319,7 @@ function kpisDoLote(lote, filtro){
   const pct=v=>Math.round(v/tot*100);
   // "No prazo" é o complemento exato de "Atrasado" — arredondar os dois separado podia dar 99/101%
   const pDep=pct(depois);
-  return {tot, antes, noDia, depois, semMeta,
+  return {tot, antes, noDia, depois, semMeta, foraJanela,
           pAntes:pct(antes), pNoDia:pct(noDia), pDepois:pDep, pNoPrazo:100-pDep,
           medio:somaDv/tot, minDv, maxDv};
 }
@@ -1773,13 +1789,17 @@ function fichaLinha(p, lote){
   const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
   const f=saldoDe(p);
   const sobra=(p.planejado||0)>0 && p.cortado>p.planejado ? p.cortado-p.planejado : 0;
-  const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
-  const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
+  // meta anterior ao arquivo: sem desvio na linha — ver metaForaDaJanela()
+  const fj=metaForaDaJanela(pz);
+  const dv=(pz&&ult&&!fj)?diasUteisEntre(ult,pz):null;
+  // "fora da janela" não cabe na coluna (a Realizada tem 112px): a linha fica com "—" e quem
+  // explica é o Status no cabeçalho mais a tarja de aviso da folha
+  const dvTxt = fj?"—" : dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
     <td class='l fx-ord'>${(oa=>oa.length<=4?oa.map(esc).join("<br>"):oa.slice(0,4).map(esc).join("<br>")+"<br>+"+(oa.length-4))([...p.ords].sort((a,b)=>a-b))}</td>
     <td>${g.iso?dateToBR(pz):"—"}</td>
-    <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
+    <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${fj?"fora":dv>0?"atr":"adi"}'>${dvTxt}</span></td>
     <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
     <td>${f?fmt(f):(sobra?`<span class='fx-sobra'>+${fmt(sobra)}</span>`:"—")}</td>
     <td class='ok-box'></td></tr>`;
@@ -1853,10 +1873,15 @@ function fichaDeLote(lote, filtro){
     </div>
     ${outrasTxt?`<div class='fx-linha fx-outras'><b>Esta folha é só de ${esc(rotuloMat(filtro))}.</b>
       O lote ${esc(lote)} ainda tem ${outrasTxt} — sai em folha separada.</div>`:""}
+    ${st.foraJanela?`<div class='fx-linha fx-outras'><b>Esta folha não julga prazo.</b>
+      A data prevista (${dateToBR(st.prazo)}) é <b>anterior ao início do arquivo</b> (${esc(AGG.datas[0])}), então o corte que
+      atendeu o prazo pode ter acontecido antes do período exportado — a coluna Realizada continua valendo, mas o desvio fica em
+      “—” e estas peças ficam fora do % e da conta de atrasadas. Pra cobrar prazo neste lote, exporte o
+      “Rel Planilhamento por Funcionário” começando antes de ${dateToBR(st.prazo)}.</div>`:""}
     ${K?`<div class='fx-linha'>
       Desvio ${filtro?"desta folha":"do lote"}: <b>${K.pAntes}% adiantado · ${K.pNoDia}% no dia · ${K.pDepois}% atrasado</b> ·
       desvio médio <b>${fmtDesvio(K.medio)}</b> (− = antes da prevista) ·
-      janela <b>${fmtDvInt(K.minDv)} a ${fmtDvInt(K.maxDv)} d</b>${K.semMeta?` · ${fmt(K.semMeta)} pç sem data prevista (fora do %)`:""}
+      janela <b>${fmtDvInt(K.minDv)} a ${fmtDvInt(K.maxDv)} d</b>${K.semMeta?` · ${fmt(K.semMeta)} pç sem data prevista (fora do %)`:""}${K.foraJanela?` · ${fmt(K.foraJanela)} pç com meta anterior ao arquivo (fora do %)`:""}
     </div>`:""}
     <div class='fx-como'><b>Como ler:</b>
       <b>Ordem</b> = nº da ordem de produção no sistema — é por ela que se confere qualquer linha no ERP.
@@ -1957,9 +1982,12 @@ function linhasDesvio(lotes, soFora, filtroMat){
       const pz=isoToDate(g.iso);
       const dias=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b);
       const ult=dias.length?dias[dias.length-1]:null;
-      const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
-      if(soFora && !(dv!==null && dv!==0)) continue;   // "só fora da prevista": tira o que saiu no dia
-      out.push({lote, p, mat, pz, ult, dv, nDias:dias.length});
+      // meta anterior ao arquivo: sem desvio — ver metaForaDaJanela(). Continua na lista mesmo em
+      // "só fora da prevista": sumir daqui esconderia justamente o lote que ninguém consegue cobrar.
+      const fj=metaForaDaJanela(pz);
+      const dv=(pz&&ult&&!fj)?diasUteisEntre(ult,pz):null;
+      if(soFora && !fj && !(dv!==null && dv!==0)) continue;   // "só fora da prevista": tira o que saiu no dia
+      out.push({lote, p, mat, pz, ult, dv, fj, nDias:dias.length});
     }
   }
   return out.sort((a,b)=>
@@ -1973,7 +2001,11 @@ function relatorioDesvio(lotes, soFora, filtroMat){
   const ag=new Date();
   const impresso=String(ag.getDate()).padStart(2,"0")+"/"+String(ag.getMonth()+1).padStart(2,"0")+"/"+String(ag.getFullYear()).slice(-2)
     +" "+String(ag.getHours()).padStart(2,"0")+":"+String(ag.getMinutes()).padStart(2,"0");
-  const atr=L.filter(x=>x.dv>0), adi=L.filter(x=>x.dv<0), noDia=L.filter(x=>x.dv===0), sem=L.filter(x=>x.dv===null);
+  const atr=L.filter(x=>x.dv>0), adi=L.filter(x=>x.dv<0), noDia=L.filter(x=>x.dv===0);
+  // "sem prevista" (lote sem data na Programação) e "fora da janela" (meta anterior ao arquivo) são
+  // coisas diferentes: as duas ficam sem desvio, mas a segunda TEM data — só não dá pra cobrar
+  const fora=L.filter(x=>x.fj), sem=L.filter(x=>x.dv===null && !x.fj);
+  const lotesFora=[...new Set(fora.map(x=>x.lote))];
   const comDv=L.filter(x=>x.dv!==null);
   // média ponderada pela quantidade cortada: 16.191 pç 3 dias antes pesam mais que 20 pç no dia
   let somaQ=0, somaDv=0;
@@ -1999,14 +2031,22 @@ function relatorioDesvio(lotes, soFora, filtroMat){
       <div class='fx-card ${pior?"fx-alerta":""}'><div class='l'>Pior atraso</div><div class='v'>${pior?"+"+pior.dv+" d":"—"}</div>
         <div class='l'>${pior?esc(pior.lote)+" · "+esc(pior.p.cod):"nenhuma peça atrasada"}</div></div>
       ${sem.length?`<div class='fx-card'><div class='l'>Sem prevista</div><div class='v'>${fmt(sem.length)}</div><div class='l'>lote sem data na Programação</div></div>`:""}
+      ${fora.length?`<div class='fx-card'><div class='l'>Fora da janela</div><div class='v'>${fmt(fora.length)}</div>
+        <div class='l'>peça(s) que este arquivo não julga</div></div>`:""}
     </div>
+    ${fora.length?`<div class='fx-linha fx-outras'><b>${fmt(fora.length)} peça(s) desta lista não entram na conta de atraso.</b>
+      São de ${lotesFora.length===1?"um lote":"lotes"} com data prevista <b>anterior ao início do arquivo</b> (${esc(AGG.datas[0])}) — ${lotesFora.map(esc).join(", ")} —
+      então o corte que atendeu o prazo pode ter acontecido antes do período exportado. Elas aparecem com desvio “fora da janela”
+      e ficam fora de <b>Atrasadas</b>, <b>Desvio médio</b> e <b>Pior atraso</b>. Pra cobrar prazo nesses lotes, exporte o
+      “Rel Planilhamento por Funcionário” a partir de uma data anterior à prevista deles.</div>`:""}
     <div class='fx-como'><b>Como ler:</b>
       uma linha por <b>peça</b>, de todos os lotes da lista — não é uma folha por lote.
       <b>Prevista</b> = data de corte do <b>material da peça</b> na Programação (MDF corta antes — vai pra pintura), por isso duas peças do mesmo lote podem ter previstas diferentes.
       <b>Realizada</b> = data do <b>último</b> corte da peça; <b>*</b> = ela saiu em mais de um dia.
       <b>Desvio</b> em <b>dias úteis</b>: <b>+3 d</b> = cortou 3 dias úteis <b>depois</b> da prevista · <b>−2 d</b> = 2 dias <b>antes</b> (foi pro pulmão) · <b>no dia</b> = na data.
       A lista vem do <b>pior atraso pro maior adiantamento</b>. <b>Falta</b> = planejado − cortado.
-      ${soFora?"Esta folha traz <b>só as peças fora da data prevista</b> — o que saiu no dia certo ficou de fora.":"Esta folha traz <b>todas as peças</b>, inclusive as que saíram no dia certo."}
+      <b>fora</b> na coluna Desvio = a data prevista é <b>anterior ao início deste arquivo</b>: a peça não é cobrada de prazo aqui (veja a tarja acima).
+      ${soFora?"Esta folha traz <b>só as peças fora da data prevista</b> — o que saiu no dia certo ficou de fora. <b>Fora da data prevista inclui o adiantado</b>: cortar antes também é sair da data, e é a maioria desta lista.":"Esta folha traz <b>todas as peças</b>, inclusive as que saíram no dia certo."}
     </div>
     <table><colgroup>
       <col style='width:74px'><col style='width:74px'><col><col style='width:66px'><col style='width:38px'>
@@ -2020,13 +2060,14 @@ function relatorioDesvio(lotes, soFora, filtroMat){
     </tr></thead><tbody>
     ${L.map(x=>{
       const f=saldoDe(x.p);
-      const dvTxt = x.dv===null?"—" : x.dv===0?"no dia" : x.dv<0?`−${-x.dv} d`:`+${x.dv} d`;
+      // "fora" curto porque a coluna Desvio tem 50px — quem explica é a tarja de aviso e a legenda
+      const dvTxt = x.fj?"fora" : x.dv===null?"—" : x.dv===0?"no dia" : x.dv<0?`−${-x.dv} d`:`+${x.dv} d`;
       return `<tr class='${x.dv>0?"falta":""}'>
         <td class='l'>${esc(x.lote)}</td><td class='l'>${esc(x.p.cod)}</td><td class='l'>${esc(x.p.desc)}</td>
         <td class='l fx-ord'>${esc(ordsCurto(x.p.ords))}</td><td class='l'>${esc(x.mat||"—")}</td>
         <td>${x.pz?dateToBR(x.pz):"—"}</td>
         <td>${x.ult?dateToBR(x.ult):"—"}${x.nDias>1?"*":""}</td>
-        <td class='fx-dv ${x.dv>0?"atr":"adi"}'>${dvTxt}</td>
+        <td class='fx-dv ${x.fj?"fora":x.dv>0?"atr":"adi"}'>${dvTxt}</td>
         <td>${x.p.planejado?fmt(x.p.planejado):"—"}</td><td>${fmt(x.p.cortado)}</td>
         <td>${f?fmt(f):"—"}</td></tr>`;
     }).join("")}
@@ -2065,6 +2106,9 @@ function imprimirDesvio(lotes, soFora, filtroMat){
 
 // Etiqueta do desvio embaixo da data realizada: −3 d = cortou 3 dias ANTES da meta; +5 d = depois.
 function desvioTag(st){
+  // meta anterior ao arquivo: o selo do lote já diz "Fora da janela", e cravar "+6 d" aqui do lado
+  // era o painel se contradizendo na mesma linha
+  if(st&&st.foraJanela) return `<div class='desvio dv-fora' title='a meta é anterior ao início do arquivo — o corte que atendeu o prazo pode ter ficado fora do período exportado'>fora da janela</div>`;
   const d=st&&st.desvio;
   if(d===null||d===undefined) return "";
   if(d===0) return `<div class='desvio dv-ok' title='cortado no dia programado'>no dia</div>`;
@@ -2126,14 +2170,15 @@ function renderPeca(){
       const mat=materialDe(p.desc);
       const gm=getMeta(lote, mat||undefined);
       const pzm=isoToDate(gm.iso);
-      const dv=(pzm&&ult)?diasUteisEntre(ult,pzm):null;
+      const fjm=metaForaDaJanela(pzm);            // meta antes do arquivo: sem "+N d" aqui também
+      const dv=(pzm&&ult&&!fjm)?diasUteisEntre(ult,pzm):null;
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
         <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(p.ords))}'>ord ${esc(ordsCurto(p.ords))}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
         <td class='num zero'>${gm.iso?dateToBR(pzm):"—"}</td>
-        <td class='num'>${ult?dateToBR(ult):"—"}${desvioTag({desvio:dv})}</td>
+        <td class='num'>${ult?dateToBR(ult):"—"}${desvioTag({desvio:dv, foraJanela:fjm})}</td>
         <td></td>
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
         <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;

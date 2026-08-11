@@ -69,6 +69,15 @@ arrasta o arquivo na tela e o painel monta na hora:
   médio ponderado pelo cortado e a pior peça). O seletor **“Desvio”** escolhe entre **só as peças
   fora da data prevista** (padrão) e **todas**. Botão na seção *Peças* (usa os lotes filtrados na
   tela) e na **matriz** (usa todos os lotes do arquivo).
+- **Lote com meta anterior ao arquivo não é cobrado de prazo** — se a data prevista do lote cai
+  **antes do primeiro dia do arquivo carregado**, o corte que atendeu o prazo pode ter acontecido
+  fora do período exportado, e o painel não tem como saber. Nesse caso **nenhuma tela afirma
+  atraso**: o selo do lote diz *Fora da janela*, o desvio some da linha, e as peças ficam fora do
+  **% atrasado**, do card **Atrasadas** e do **Pior atraso**. Elas continuam aparecendo na lista,
+  com desvio `fora`, e uma tarja diz de quais lotes se trata. Antes essa trava existia só no
+  *Prazo por lote*: o mesmo lote saía como “não dá pra avaliar” numa tela e como “pior atraso da
+  fábrica” no relatório de desvio. Pra cobrar prazo nesses lotes, exporte o *Rel Planilhamento por
+  Funcionário* a partir de uma data anterior à prevista deles.
 - **Filtro de material na matriz** — o seletor **“Material”** (ao lado de *Operador*) deixa a matriz
   mostrando **só o corte de MDF**, **só o de MDP** ou só o que não diz o material na descrição.
   Tudo na tela passa a ser daquele material: quantidades, totais, “Lotes no dia”, “Antecipado
