@@ -870,10 +870,14 @@ function cellToISO(v){
    O lote tem DUAS datas de corte na Programação, e não uma: o MDF é cortado antes porque vai
    pra pintura. Então cada peça tem que ser cobrada contra a data do material dela — comparar
    peça de MDF com a data do MDP (ou o contrário) dá atraso/adiantamento falso.
-   O material vem na descrição da peça ("... 670X430X15 MDP 2 BRANCO"). */
+   O material vem na descrição da peça ("... 670X430X15 MDP 2 BRANCO") — mas o ERP às vezes
+   cola o material na medida/espessura ("...417X14X15MDF7 BCO"), e entre dígito e letra não
+   existe \b: com \bMDF\b a peça caía como "sem material" mesmo dizendo MDF. Vale qualquer
+   MDF/MDP que não esteja grudado em OUTRA LETRA (dígito do lado é medida/espessura, pode). */
 const MATS=["MDF","MDP"];
 function materialDe(desc){ const s=String(desc||"").toUpperCase();
-  if(/\bMDF\b/.test(s)) return "MDF"; if(/\bMDP\b/.test(s)) return "MDP"; return ""; }
+  if(/(^|[^A-Z])MDF(?![A-Z])/.test(s)) return "MDF";
+  if(/(^|[^A-Z])MDP(?![A-Z])/.test(s)) return "MDP"; return ""; }
 function materialDaOrdem(ordem){ const p=PECA_MAP[ordem]; return p? materialDe(p.desc) : ""; }
 /* Filtro de material usado pelas fichas, pelos dias e pelos KPIs:
    "" = tudo · "MDF"/"MDP" = só esse material · "SEM" = peça cuja descrição não diz o material

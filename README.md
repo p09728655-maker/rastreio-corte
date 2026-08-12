@@ -146,7 +146,8 @@ qual dos dois caminhos foi usado (`colunas pelo cabeçalho` ou `pelo padrão A=M
 ali antes de confiar nos prazos.
 
 O material de cada peça sai da **descrição** (`... 670X430X15 MDP 2 BRANCO`), e é assim que cada peça
-é cobrada contra a data certa. Peça sem `MDF`/`MDP` na descrição (perfil, papelão) fica sem material
+é cobrada contra a data certa. Vale também quando o ERP **cola o material na medida/espessura**
+(`...417X14X15MDF7 BCO` conta como MDF). Peça sem `MDF`/`MDP` na descrição (perfil, papelão) fica sem material
 e cai na data mais tarde do lote. Datas digitadas na mão também são **por material** — a tabela de
 prazo tem um campo pra cada. Dados salvos no formato antigo (uma data só) migram sozinhos para MDP,
 que era a coluna que o painel lia antes.
