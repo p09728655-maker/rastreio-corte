@@ -1984,6 +1984,14 @@ function relatorioDesvio(lotes, soFora, filtroMat){
   const medio = somaQ? somaDv/somaQ : null;
   const pior = atr.length? atr[0] : null;
   const totC=L.reduce((s,x)=>s+x.p.cortado,0), totF=L.reduce((s,x)=>s+saldoDe(x.p),0);
+  // Por que o total de cortado pode não bater com o planejado — o rodapé tem que se explicar:
+  // linha SEM planejado (ordem fora do Produto: o cortado conta, o planejado não) e SOBRA
+  // (cortou acima do planejado; a Falta é max(0,…), então a sobra sumia da conta).
+  const totP=L.reduce((s,x)=>s+(x.p.planejado||0),0);
+  const semPlan=L.filter(x=>!(x.p.planejado>0));
+  const semPlanQ=semPlan.reduce((s,x)=>s+x.p.cortado,0);
+  const sobraDe=p=>((p.planejado||0)>0 && p.cortado>p.planejado) ? p.cortado-p.planejado : 0;
+  const sobraQ=L.reduce((s,x)=>s+sobraDe(x.p),0);
   const lotesLista=[...new Set(L.map(x=>x.lote))];
   return `<div class='fx-pg'>
     <div class='fx-cab'>
@@ -2008,7 +2016,8 @@ function relatorioDesvio(lotes, soFora, filtroMat){
       <b>Prevista</b> = data de corte do <b>material da peça</b> na Programação (MDF corta antes — vai pra pintura), por isso duas peças do mesmo lote podem ter previstas diferentes.
       <b>Realizada</b> = data do <b>último</b> corte da peça; <b>*</b> = ela saiu em mais de um dia.
       <b>Desvio</b> em <b>dias úteis</b>: <b>+3 d</b> = cortou 3 dias úteis <b>depois</b> da prevista · <b>−2 d</b> = 2 dias <b>antes</b> (foi pro pulmão) · <b>no dia</b> = na data.
-      A lista vem do <b>pior atraso pro maior adiantamento</b>. <b>Falta</b> = planejado − cortado.
+      A lista vem do <b>pior atraso pro maior adiantamento</b>. <b>Falta</b> = planejado − cortado; <b>+N</b> na Falta = cortou <b>acima</b> do planejado (sobra).
+      Planejado <b>—</b> = a ordem não está em nenhum relatório por Produto carregado: o cortado dela entra no total, o planejado não.
       ${soFora?"Esta folha traz <b>só as peças fora da data prevista</b> — o que saiu no dia certo ficou de fora.":"Esta folha traz <b>todas as peças</b>, inclusive as que saíram no dia certo."}
     </div>
     <table><colgroup>
@@ -2022,7 +2031,7 @@ function relatorioDesvio(lotes, soFora, filtroMat){
       <th>Prevista</th><th>Realizada</th><th>Desvio</th><th>Planejado</th><th>Cortado</th><th>Falta</th>
     </tr></thead><tbody>
     ${L.map(x=>{
-      const f=saldoDe(x.p);
+      const f=saldoDe(x.p), sb=sobraDe(x.p);
       const dvTxt = x.dv===null?"—" : x.dv===0?"no dia" : x.dv<0?`−${-x.dv} d`:`+${x.dv} d`;
       return `<tr class='${x.dv>0?"falta":""}'>
         <td class='l'>${esc(x.lote)}</td><td class='l'>${esc(x.p.cod)}</td><td class='l'>${esc(x.p.desc)}</td>
@@ -2031,10 +2040,11 @@ function relatorioDesvio(lotes, soFora, filtroMat){
         <td>${x.ult?dateToBR(x.ult):"—"}${x.nDias>1?"*":""}</td>
         <td class='fx-dv ${x.dv>0?"atr":"adi"}'>${dvTxt}</td>
         <td>${x.p.planejado?fmt(x.p.planejado):"—"}</td><td>${fmt(x.p.cortado)}</td>
-        <td>${f?fmt(f):"—"}</td></tr>`;
+        <td>${f?fmt(f):(sb?`<span class='fx-sobra'>+${fmt(sb)}</span>`:"—")}</td></tr>`;
     }).join("")}
     <tr class='fx-sub'><td class='l' colspan='8'><b>Total — ${fmt(L.length)} peça(s) em ${lotesLista.length} lote(s)</b></td>
-      <td><b>${fmt(L.reduce((s,x)=>s+(x.p.planejado||0),0))}</b></td><td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"—"}</b></td></tr>
+      <td><b>${fmt(totP)}</b></td><td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"—"}</b></td></tr>
+    ${totP!==totC?`<tr class='fx-sub'><td class='l' colspan='11'>Planejado (${fmt(totP)}) × cortado (${fmt(totC)}) não batem porque:${semPlanQ?` <b>${fmt(semPlanQ)} pç</b> cortadas em ${semPlan.length} linha(s) <b>sem planejado</b> (ordem fora do relatório por Produto — o cortado entra no total, o planejado não)`:""}${semPlanQ&&sobraQ?" ·":""}${sobraQ?` <b>${fmt(sobraQ)} pç</b> de <b>sobra</b> (cortado acima do planejado, o “+N” da coluna Falta)`:""}${(semPlanQ||sobraQ)&&totF?" ·":""}${totF?` <b>${fmt(totF)} pç</b> de <b>falta</b> (planejado ainda não cortado)`:""}.</td></tr>`:""}
     </tbody></table>
     <div class='fx-nota'>
       Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM,
