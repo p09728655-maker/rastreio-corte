@@ -1010,7 +1010,10 @@ function parseProgramacao(wb){
 /* ---------- parse "Rel Planilhamento por Produto" (peça = PRODUTO; chave = nº da ORDEM) ----------
    Blocos:  [_, "PRODUTO", <cód>, <descrição>]  seguidos de linhas de operação
    Operação (0-based): 0=ORDEM 1=QTDE ORDEM 2=QTDE PROD. 3=DATA 4=MÁQcód 5=MÁQnome 6=FUNCcód 7=FUNCnome
-   Devolve ordem -> {cod, desc, qtdeOrdem}. Só liga a peça ao lote via ORDEM (o outro relatório traz o lote). */
+   Devolve ordem -> {cod, desc, qtdeOrdem}. Só liga a peça ao lote via ORDEM (o outro relatório traz o lote).
+   A QTDE ORDEM é POR LINHA (a parcela da ordem naquela operação): a mesma ordem pode voltar em
+   outra linha/dia — caso real: 799308 = 200 pç em 03/08 + 200 pç em 04/08. Por isso ela SOMA.
+   Contar uma vez só por ordem fazia o painel acusar sobra de "+200" numa ordem que estava exata. */
 function parseProduto(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
@@ -1023,13 +1026,17 @@ function parseProduto(wb){
       // (col 0 = ORDEM, e as colunas de quantidade/data viram o cabeçalho). Sem tratar, essa
       // ordem some do mapa e a peça dela nunca aparece. A ordem é do produto VIGENTE — o
       // cabeçalho só passa a valer da linha seguinte.
-      if(typeof c[0]==="number" && cur){ map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:0}; n++; hibridas++; }
+      // a quantidade da linha híbrida é ilegível (virou cabeçalho) — entra somando 0
+      if(typeof c[0]==="number" && cur){ map[c[0]]=map[c[0]]||{cod:cur.cod, desc:cur.desc, qtdeOrdem:0}; n++; hibridas++; }
       cur={cod:String(c[2]||"").trim(), desc:String(c[3]||"").trim()};
       continue;
     }
     if(c[0]==="ORDEM") continue;                 // cabeçalho de colunas
     if(typeof c[0]==="number"){                  // linha de operação → mapeia ORDEM p/ a peça vigente
-      if(cur){ map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:Math.trunc(parseBR(c[1]))}; n++; }
+      if(cur){
+        const e=map[c[0]]||(map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:0});
+        e.qtdeOrdem+=Math.trunc(parseBR(c[1])); n++;      // QTDE ORDEM soma por linha (ver acima)
+      }
       if(typeof c[3]==="string" && /\d\d?\/\d\d?\/\d\d/.test(c[3])) datas.add(c[3].trim());
       continue;
     }
@@ -2667,7 +2674,14 @@ function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); i
 // e cobrir toda a janela do relatório de Corte.
 function applyPeca(prod, file){
   let novos=0;
-  for(const ordem in prod.map){ if(!(ordem in PECA_MAP)) novos++; PECA_MAP[ordem]=prod.map[ordem]; }
+  for(const ordem in prod.map){
+    const nv=prod.map[ordem], ex=PECA_MAP[ordem];
+    if(!ex) novos++;
+    // mesma ordem em dois arquivos = períodos sobrepostos. A QTDE ORDEM soma por linha DENTRO
+    // de cada arquivo; entre arquivos vale o que enxerga a ordem mais completa (maior soma) —
+    // somar os dois dobraria o planejado de tudo que aparece nos dois períodos.
+    if(!ex || (nv.qtdeOrdem||0)>(ex.qtdeOrdem||0)) PECA_MAP[ordem]=nv;
+  }
   PROD_PERIOD = periodoDosDados(prod.datas) || prod.period || "";
   PROD_FILES.push({nome:file?file.name:"(arquivo)", period:PROD_PERIOD, n:prod.n, novos});
   if(AGG){
