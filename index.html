@@ -442,6 +442,10 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha .fx-dv{font-family:var(--font-d);font-size:8px;font-weight:700}
   #ficha .fx-dv.atr{color:#c62828} #ficha .fx-dv.adi{color:#2e7d32}
   #ficha .fx-sobra{color:#e65100;font-weight:700}
+  /* m² é conferência, não instrução de máquina: fica um tom abaixo do cortado/falta.
+     A nota de cobertura vai no subtotal, em texto miúdo, quando o m² é só de parte das peças. */
+  #ficha td.fx-m2{color:#444}
+  #ficha .fx-cob{font-family:var(--font-d);font-size:8px;font-weight:400;color:#666;text-transform:none;letter-spacing:0}
   #ficha .fx-card .l+.v+.l{margin-top:2px}
   #ficha td.ok-box{width:58px;background:#fff}   /* espaço pro operador marcar de caneta */
   #ficha .fx-rod{margin-top:14px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
@@ -1921,12 +1925,14 @@ function fichaLinha(p, lote){
   const sobra=(p.planejado||0)>0 && p.cortado>p.planejado ? p.cortado-p.planejado : 0;
   const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
   const dvTxt = dv===null?"" : dv===0?"no dia" : dv<0?`−${-dv} d`:`+${dv} d`;
+  const a2=m2DaPeca(p.desc);      // área de UMA peça (0 = a descrição não traz a medida)
   return `<tr class='${f?"falta":""}'>
     <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
     <td class='l fx-ord'>${(oa=>oa.length<=4?oa.map(esc).join("<br>"):oa.slice(0,4).map(esc).join("<br>")+"<br>+"+(oa.length-4))([...p.ords].sort((a,b)=>a-b))}</td>
     <td>${g.iso?dateToBR(pz):"—"}</td>
     <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
     <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
+    <td class='fx-m2'>${a2?fmtM2(a2*p.cortado):"—"}</td>
     <td>${f?fmt(f):(sobra?`<span class='fx-sobra'>+${fmt(sobra)}</span>`:"—")}</td>
     <td class='ok-box'></td></tr>`;
 }
@@ -1949,6 +1955,7 @@ function fichaDeLote(lote, filtro){
   const totC=pecas.reduce((s,p)=>s+p.cortado,0);
   const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
   const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
+  const M2F=m2DasPecas(pecas);          // m² cortado desta folha (e de quantas peças ele saiu)
   const nFalta=pecas.filter(p=>saldoDe(p)>0).length;
   const semPeca=pecas.some(p=>p.cod==="—");
   // MDF primeiro: ele corta antes porque vai pra pintura — é a ordem em que a máquina precisa ler
@@ -1988,6 +1995,8 @@ function fichaDeLote(lote, filtro){
       ${cards}
       <div class='fx-card'><div class='l'>Planejado</div><div class='v'>${totP?fmt(totP):"—"}</div></div>
       <div class='fx-card'><div class='l'>Já cortado</div><div class='v'>${fmt(totC)}</div></div>
+      ${M2F.m2?`<div class='fx-card'><div class='l'>m² cortado</div><div class='v'>${fmtM2(M2F.m2)}</div>
+        <div class='l'>${M2F.pct<100?`de ${fmt(M2F.com)} de ${fmt(M2F.tot)} pç`:"área das peças"}</div></div>`:""}
       <div class='fx-card ${totF?"fx-alerta":""}'><div class='l'>Falta cortar</div><div class='v'>${totF?fmt(totF):"0"}</div>
         <div class='l'>${pecas.length} peça(s)${nFalta?` · ${nFalta} c/ falta`:""}</div></div>
       ${K?`<div class='fx-card ${K.pDepois>=10?"fx-alerta":""}'><div class='l'>No prazo</div><div class='v'>${K.pNoPrazo}%</div>
@@ -2012,25 +2021,29 @@ function fichaDeLote(lote, filtro){
       O <b>Status</b> do lote olha só o último corte — por isso pode dizer “Atrasado” mesmo com quase tudo no prazo;
       o card <b>“No prazo”</b> é a fatia do volume cortado até a prevista.
       <b>Falta</b> = planejado − cortado. <b>OK</b> = espaço pra marcar na máquina ao conferir.
+      <b>m² cortado</b> = área das peças que já saíram, calculada da <b>medida da própria descrição</b> (“670X430X15” = 670 × 430 mm) —
+      <b>não é consumo de chapa</b>: não entra perda de corte, refilo nem sobra, então o consumo real é maior.
+      Peça cuja descrição não traz a medida sai com <b>—</b> e fica fora do total.
     </div>
     ${grupos.map(gr=>{
       const g=gr.mat?getMeta(lote,gr.mat):{iso:""};
       const sC=gr.lista.reduce((s,p)=>s+p.cortado,0), sP=gr.lista.reduce((s,p)=>s+(p.planejado||0),0), sF=gr.lista.reduce((s,p)=>s+saldoDe(p),0);
+      const sM=m2DasPecas(gr.lista);   // m² cortado do grupo + quantas peças tinham medida
       return `<table><colgroup>
         <col style='width:86px'><col><col style='width:72px'><col style='width:68px'><col style='width:112px'>
-        <col style='width:68px'><col style='width:64px'><col style='width:58px'><col style='width:54px'>
+        <col style='width:68px'><col style='width:64px'><col style='width:62px'><col style='width:58px'><col style='width:54px'>
       </colgroup><thead>
-      <tr class='fx-grp'><th class='l' colspan='9'>${esc(lote)} · ${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</th></tr>
+      <tr class='fx-grp'><th class='l' colspan='10'>${esc(lote)} · ${gr.mat?esc(gr.mat):"Sem material na descrição"}${gr.mat==="MDF"?" — corta antes (vai pra pintura)":""}${g.iso?` · prevista <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</th></tr>
       <tr>
         <th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th>
-        <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Cortado</th><th>Falta</th><th class='c'>OK</th>
+        <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Cortado</th><th>m² cortado</th><th>Falta</th><th class='c'>OK</th>
       </tr></thead><tbody>
       ${gr.lista.map(p=>fichaLinha(p,lote)).join("")}
-      <tr class='fx-sub'><td class='l' colspan='5'><b>Subtotal ${esc(gr.mat||"—")}</b></td><td><b>${sP?fmt(sP):"—"}</b></td>
-        <td><b>${fmt(sC)}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
+      <tr class='fx-sub'><td class='l' colspan='5'><b>Subtotal ${esc(gr.mat||"—")}</b>${sM.sem?` <span class='fx-cob'>· m² de ${fmt(sM.com)} de ${fmt(sM.tot)} pç cortadas (as outras não trazem a medida na descrição)</span>`:""}</td><td><b>${sP?fmt(sP):"—"}</b></td>
+        <td><b>${fmt(sC)}</b></td><td class='fx-m2'><b>${sM.m2?fmtM2(sM.m2):"—"}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
       </tbody></table>`;
     }).join("")}
-    <div class='fx-linha'><b>Total ${filtro?`desta folha (${esc(rotuloMat(filtro))})`:"do lote"}:</b> planejado ${totP?fmt(totP):"—"} · cortado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}</div>
+    <div class='fx-linha'><b>Total ${filtro?`desta folha (${esc(rotuloMat(filtro))})`:"do lote"}:</b> planejado ${totP?fmt(totP):"—"} · cortado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}${M2F.m2?` · <b>${fmtM2(M2F.m2)} m²</b> cortados${M2F.sem?` (de ${fmt(M2F.com)} de ${fmt(M2F.tot)} pç — as outras não trazem a medida na descrição)`:""}`:""}</div>
     <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
     <div class='fx-nota'>
       ${filtro?`Esta folha traz <b>só as peças de ${esc(rotuloMat(filtro))}</b> deste lote — planejado, cortado, falta e % são desta folha, não do lote inteiro.
