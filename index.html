@@ -1769,6 +1769,8 @@ function abrirDetalhe(data, lote){
     sub += ` · data programada do lote ${dateToBR(prazo)}` +
       (d===0? " — cortado no dia" : d<0? ` — ${-d} dia(s) útil(eis) ANTES da programada` : ` — ${d} dia(s) útil(eis) depois da programada`);
   } else sub += " · lote sem data programada";
+  const M2=m2DasPecas(pecas);          // área do que saiu neste dia neste lote
+  if(M2.m2) sub += ` · ${fmtM2(M2.m2)} m² cortados aqui` + (M2.pct<100?` (de ${fmt(M2.com)} de ${fmt(M2.tot)} pç — as outras não trazem a medida na descrição)`:"");
   const nld=lotesNoDia(data);
   sub += ` · neste dia a fábrica cortou ${nld} lote${nld===1?"":"s"} diferente${nld===1?"":"s"}`;
   const A=antecipadoPorDia(AGG.recs)[data];
@@ -1785,16 +1787,17 @@ function abrirDetalhe(data, lote){
   document.getElementById("modal-sub").textContent=sub;
   document.getElementById("modal-kpis").innerHTML=kpiCardsLote(lote, matF);
 
-  let h=`<table><thead><tr><th class='l'>Peça</th><th>Ordem</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
-  if(!pecas.length) h+=`<tr><td class='l' colspan='5' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
+  let h=`<table><thead><tr><th class='l'>Peça</th><th>Ordem</th><th>Cortado</th><th title='Área das peças, calculada da medida (C × L) da descrição — não é consumo de chapa'>m²</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
+  if(!pecas.length) h+=`<tr><td class='l' colspan='6' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” do período.</td></tr>`;
   for(const p of pecas){
     h+=`<tr><td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
       <td class='num'>${esc(ordsStr(p.ords))}</td>
       <td class='num'>${fmt(p.cortado)}</td>
+      ${celM2(m2DasPecas([p]))}
       <td class='l'>${esc([...p.maqs].join(", "))}</td>
       <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
   }
-  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td></td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
+  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td></td><td>${fmt(tot)}</td>${celM2(M2)}<td></td><td></td></tr></tbody></table>`;
   document.getElementById("modal-corpo").innerHTML=h;
   document.getElementById("modal").classList.remove("hidden");
 }
@@ -2148,6 +2151,7 @@ function relatorioDesvio(lotes, soFora, filtroMat){
   const semPlanQ=semPlan.reduce((s,x)=>s+x.p.cortado,0);
   const sobraDe=p=>((p.planejado||0)>0 && p.cortado>p.planejado) ? p.cortado-p.planejado : 0;
   const sobraQ=L.reduce((s,x)=>s+sobraDe(x.p),0);
+  const M2L=m2DasPecas(L.map(x=>x.p));    // m² cortado da folha inteira (e de quantas peças ele saiu)
   const lotesLista=[...new Set(L.map(x=>x.lote))];
   return `<div class='fx-pg'>
     <div class='fx-cab'>
@@ -2174,17 +2178,18 @@ function relatorioDesvio(lotes, soFora, filtroMat){
       <b>Desvio</b> em <b>dias úteis</b>: <b>+3 d</b> = cortou 3 dias úteis <b>depois</b> da prevista · <b>−2 d</b> = 2 dias <b>antes</b> (foi pro pulmão) · <b>no dia</b> = na data.
       A lista vem do <b>pior atraso pro maior adiantamento</b>. <b>Falta</b> = planejado − cortado; <b>+N</b> na Falta = cortou <b>acima</b> do planejado (sobra).
       Planejado <b>—</b> = a ordem não está em nenhum relatório por Produto carregado: o cortado dela entra no total, o planejado não.
+      <b>m² cortado</b> = área do que já saiu, calculada da <b>medida da própria descrição</b> — <b>não é consumo de chapa</b> (não entra perda de corte, refilo nem sobra); peça sem medida na descrição sai com <b>—</b> e fica fora do total.
       ${soFora?"Esta folha traz <b>só as peças fora da data prevista</b> — o que saiu no dia certo ficou de fora.":"Esta folha traz <b>todas as peças</b>, inclusive as que saíram no dia certo."}
     </div>
     <table><colgroup>
       <col style='width:74px'><col style='width:74px'><col><col style='width:66px'><col style='width:38px'>
       <col style='width:62px'><col style='width:62px'><col style='width:50px'>
-      <col style='width:62px'><col style='width:58px'><col style='width:52px'>
+      <col style='width:62px'><col style='width:58px'><col style='width:62px'><col style='width:52px'>
     </colgroup><thead>
-    <tr class='fx-grp'><th class='l' colspan='11'>Desvio por peça${filtroMat?` · <b>${esc(rotuloMat(filtroMat))}</b>`:""} · <b>${fmt(L.length)} peça(s)</b> em ${lotesLista.length} lote(s) · ${soFora?"só o que saiu fora da data prevista":"todas as peças"} · do pior atraso pro maior adiantamento</th></tr>
+    <tr class='fx-grp'><th class='l' colspan='12'>Desvio por peça${filtroMat?` · <b>${esc(rotuloMat(filtroMat))}</b>`:""} · <b>${fmt(L.length)} peça(s)</b> em ${lotesLista.length} lote(s) · ${soFora?"só o que saiu fora da data prevista":"todas as peças"} · do pior atraso pro maior adiantamento</th></tr>
     <tr>
       <th class='l'>Lote</th><th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th><th class='l'>Mat.</th>
-      <th>Prevista</th><th>Realizada</th><th>Desvio</th><th>Planejado</th><th>Cortado</th><th>Falta</th>
+      <th>Prevista</th><th>Realizada</th><th>Desvio</th><th>Planejado</th><th>Cortado</th><th>m² cortado</th><th>Falta</th>
     </tr></thead><tbody>
     ${L.map(x=>{
       const f=saldoDe(x.p), sb=sobraDe(x.p);
@@ -2196,11 +2201,12 @@ function relatorioDesvio(lotes, soFora, filtroMat){
         <td>${x.ult?dateToBR(x.ult):"—"}${x.nDias>1?"*":""}</td>
         <td class='fx-dv ${x.dv>0?"atr":"adi"}'>${dvTxt}</td>
         <td>${x.p.planejado?fmt(x.p.planejado):"—"}</td><td>${fmt(x.p.cortado)}</td>
+        <td class='fx-m2'>${(a=>a?fmtM2(a*x.p.cortado):"—")(m2DaPeca(x.p.desc))}</td>
         <td>${f?fmt(f):(sb?`<span class='fx-sobra'>+${fmt(sb)}</span>`:"—")}</td></tr>`;
     }).join("")}
-    <tr class='fx-sub'><td class='l' colspan='8'><b>Total — ${fmt(L.length)} peça(s) em ${lotesLista.length} lote(s)</b></td>
-      <td><b>${fmt(totP)}</b></td><td><b>${fmt(totC)}</b></td><td><b>${totF?fmt(totF):"—"}</b></td></tr>
-    ${totP!==totC?`<tr class='fx-sub'><td class='l' colspan='11'>Planejado (${fmt(totP)}) × cortado (${fmt(totC)}) não batem porque:${semPlanQ?` <b>${fmt(semPlanQ)} pç</b> cortadas em ${semPlan.length} linha(s) <b>sem planejado</b> (ordem fora do relatório por Produto — o cortado entra no total, o planejado não)`:""}${semPlanQ&&sobraQ?" ·":""}${sobraQ?` <b>${fmt(sobraQ)} pç</b> de <b>sobra</b> (cortado acima do planejado, o “+N” da coluna Falta)`:""}${(semPlanQ||sobraQ)&&totF?" ·":""}${totF?` <b>${fmt(totF)} pç</b> de <b>falta</b> (planejado ainda não cortado)`:""}.</td></tr>`:""}
+    <tr class='fx-sub'><td class='l' colspan='8'><b>Total — ${fmt(L.length)} peça(s) em ${lotesLista.length} lote(s)</b>${M2L.sem?` <span class='fx-cob'>· m² de ${fmt(M2L.com)} de ${fmt(M2L.tot)} pç cortadas (as outras não trazem a medida na descrição)</span>`:""}</td>
+      <td><b>${fmt(totP)}</b></td><td><b>${fmt(totC)}</b></td><td class='fx-m2'><b>${M2L.m2?fmtM2(M2L.m2):"—"}</b></td><td><b>${totF?fmt(totF):"—"}</b></td></tr>
+    ${totP!==totC?`<tr class='fx-sub'><td class='l' colspan='12'>Planejado (${fmt(totP)}) × cortado (${fmt(totC)}) não batem porque:${semPlanQ?` <b>${fmt(semPlanQ)} pç</b> cortadas em ${semPlan.length} linha(s) <b>sem planejado</b> (ordem fora do relatório por Produto — o cortado entra no total, o planejado não)`:""}${semPlanQ&&sobraQ?" ·":""}${sobraQ?` <b>${fmt(sobraQ)} pç</b> de <b>sobra</b> (cortado acima do planejado, o “+N” da coluna Falta)`:""}${(semPlanQ||sobraQ)&&totF?" ·":""}${totF?` <b>${fmt(totF)} pç</b> de <b>falta</b> (planejado ainda não cortado)`:""}.</td></tr>`:""}
     </tbody></table>
     <div class='fx-nota'>
       Origem: “Rel Planilhamento por Funcionário”${FUNC_PERIOD?" ("+esc(FUNC_PERIOD)+")":""} cruzado com “Rel Planilhamento por Produto” pelo nº da ORDEM,

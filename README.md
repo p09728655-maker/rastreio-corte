@@ -98,9 +98,11 @@ arrasta o arquivo na tela e o painel monta na hora:
   lote* (por peça e por lote) e outra em *Peças cortadas em cada dia* (por peça e o **total do dia**),
   além das colunas nos arquivos exportados (com a medida usada, pra conferir). Precisa do
   **relatório por Produto** carregado — é ele que traz a descrição.
-  Na **ficha de corte impressa** também: um card `m² cortado` no topo, a coluna `m² cortado` de cada
-  peça, o subtotal por material e o total da folha — com a nota de quantas peças entraram na conta
-  quando alguma não traz medida.
+  **Em tudo que é impresso** também: na **ficha de corte** (card `m² cortado` no topo, coluna por peça,
+  subtotal por material e total da folha), no **desvio por peça** (coluna e total) e no **relatório em
+  PDF** do painel inteiro. E no **detalhe de uma célula da matriz** (clicar numa quantidade), com o m²
+  daquele dia naquele lote. Em todos eles vai junto **de quantas peças o número saiu** quando alguma
+  não traz a medida.
   **Duas coisas pra ler certo:** (1) é a **área líquida das peças**, e **não consumo de chapa** — não
   entra perda de corte, refilo nem sobra, então o consumo real é sempre maior; (2) peça cuja descrição
   **não traz medida legível fica de fora**, e o painel diz sempre **qual fatia das peças entrou na
