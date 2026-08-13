@@ -56,6 +56,9 @@ main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
 #filebar .fname{font-family:var(--font-d);font-size:12px;color:var(--txt)}
 #filebar .fper{font-family:var(--font-d);font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:1px}
 #filebar .sep{color:var(--txt3)}
+/* "salvo neste navegador": o arquivo volta sozinho na próxima abertura */
+#filebar .fsalvo{font-family:var(--font-d);font-size:10.5px;color:var(--ok);letter-spacing:.5px}
+#filebar .btn-esquecer{margin-left:0}
 .linkbtn{background:none;border:.5px solid var(--border);color:var(--txt2);font-family:var(--font-d);font-size:11px;
   text-transform:uppercase;letter-spacing:1px;padding:7px 14px;border-radius:6px;cursor:pointer;margin-left:auto}
 .linkbtn:hover{border-color:var(--acc);color:var(--acc)}
@@ -243,6 +246,9 @@ td.zero{color:var(--txt3)}
 #tbl-prazo th small{text-transform:none;letter-spacing:0;color:var(--txt3)}
 #tbl-matriz .trprog .prog-lin{display:flex;align-items:center;justify-content:flex-end;gap:4px;line-height:1.5}
 #tbl-matriz .trprog .prog-lin .mat-tag{margin-right:0}
+/* m² calculado da medida da descrição: o "*" marca linha em que nem toda peça tinha medida
+   legível — o número existe, mas é de uma parte das peças (o title diz de quantas) */
+.m2-parc{color:var(--warn);font-size:10px;vertical-align:super;margin-left:1px}
 .peca-warn{background:rgba(255,152,0,.1);border:.5px solid rgba(255,152,0,.45);color:#ffcc80;
   padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:12px;line-height:1.45}
 
@@ -536,7 +542,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> (.xlsx) que você exporta do sistema.
       O painel monta a comparação por lote e data automaticamente — nada é enviado pra internet, tudo roda no seu navegador.</div>
     <div class="btn">Selecionar arquivo</div>
-    <div class="hint">.xlsx exportado do sistema · fica tudo local</div>
+    <div class="hint">.xlsx exportado do sistema · fica tudo local · o último arquivo fica salvo neste navegador e volta sozinho</div>
     <input type="file" id="file" accept=".xlsx,.xls" class="hidden">
   </div>
   <div id="err" class="err hidden"></div>
@@ -547,7 +553,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <span class="fname" id="fname"></span>
       <span class="sep">·</span>
       <span class="fper" id="fper"></span>
+      <span class="fsalvo" id="fsalvo" title="O último arquivo carregado fica guardado neste navegador — ao abrir o painel de novo ele volta sozinho. Nada sai daqui."></span>
       <button class="linkbtn" id="trocar">Trocar arquivo</button>
+      <button class="linkbtn btn-esquecer hidden" id="btn-esquecer" title="Apaga do navegador os arquivos guardados — na próxima vez o painel abre vazio">Esquecer arquivo salvo</button>
     </div>
 
     <div id="print-head" class="print-only">
@@ -606,7 +614,10 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <b>🖶 Ficha de corte</b>: gera uma folha por lote pra levar na máquina, com a lista de peças, <b>o que ainda falta cortar</b> e espaço pro operador marcar e assinar.
         A ficha inclui as peças <b>ainda não cortadas</b> (que não aparecem na tabela abaixo).
         Como <b>MDF e MDP cortam em dias diferentes</b> (o MDF vai pra pintura antes), a ficha sai <b>separada por material</b>: uma folha de MDF e outra de MDP, cada uma fechada em si
-        (prevista, planejado, cortado e falta só daquele material). No seletor <b>“Ficha”</b> dá pra imprimir <b>só MDF</b> ou <b>só MDP</b> — é assim que se gera <b>um PDF de cada</b> — ou voltar tudo pra mesma folha.</div>
+        (prevista, planejado, cortado e falta só daquele material). No seletor <b>“Ficha”</b> dá pra imprimir <b>só MDF</b> ou <b>só MDP</b> — é assim que se gera <b>um PDF de cada</b> — ou voltar tudo pra mesma folha.
+        A coluna <b>m²</b> é a <b>área das peças cortadas</b>, calculada da <b>medida que vem na descrição</b> (“670X430X15” = 670 × 430 mm, 15 de espessura).
+        Ela <b>não é consumo de chapa</b>: é a área líquida das peças, sem perda de corte, refilo nem sobra de chapa — o consumo real é sempre maior.
+        Peça cuja descrição não traz medida legível fica <b>de fora</b> da conta, e o <b>*</b> ao lado do número avisa que aquela linha tem peça sem medida (passe o mouse pra ver quantas entraram).</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
         <button class="linkbtn" id="btn-prod-limpar" style="margin:0">Limpar peças carregadas</button>
@@ -709,6 +720,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <h2>Peças cortadas em cada dia <span class="tag">rastreio da data, peça a peça</span></h2>
       <div class="sec-sub">O mesmo rastreio de datas da matriz por lote, só que <b>mostrando a peça</b>: abra um dia e veja
         <b>exatamente quais peças foram cortadas naquela data</b> (código, descrição, lote, quanto saiu, máquina e operador).
+        A coluna <b>m²</b> traz a <b>área cortada no dia</b> (da medida na descrição da peça) — é a leitura de <b>quanto de material</b> saiu, e não só de quantas peças.
+        <b>Não é consumo de chapa</b>: é a área líquida das peças, sem perda de corte nem sobra.
         Precisa do <b>“Rel Planilhamento por Produto”</b> carregado na seção Peças (mesmo período do Corte).</div>
       <div id="pd-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (botão na seção <b>Peças cortadas por lote</b>, acima) para ver as peças de cada dia.</div>
       <div id="pd-bar" class="prazo-actions" style="display:none">
@@ -814,6 +827,70 @@ let PROD_PERIOD = "";   // "Período de:" do último relatório por Produto — 
 // É o que resolve o caso "o Corte é de 23/07 a 30/07 mas o Produto exportado é só de um dia".
 let PROD_FILES = [];    // [{nome, period, n, novos}] — só p/ mostrar o que já foi carregado
 
+/* ---------- O ÚLTIMO ARQUIVO FICA SALVO NO NAVEGADOR ----------
+   O painel roda 100% local e não tem servidor: fechar a aba jogava fora o arquivo e obrigava a
+   arrastar o mesmo relatório de novo toda manhã. Aqui os BYTES do .xlsx ficam guardados no
+   IndexedDB do próprio navegador (localStorage não serve — o relatório tem megabytes) e, ao
+   abrir o painel, ele volta sozinho e é reprocessado pelos mesmos parsers. Continua tudo local:
+   nada é enviado pra lugar nenhum, e o botão "Esquecer arquivo salvo" apaga.
+   Guarda o relatório de Corte e TODOS os relatórios por Produto carregados (as datas da
+   Programação já ficavam salvas à parte, no localStorage). */
+const IDB_NOME="rastreioCorte", IDB_LOJA="arquivos";
+let PROD_BUFS=[];       // [{nome, buf}] dos relatórios por Produto — p/ salvar/restaurar junto
+let ARQ_SALVO=null;     // {nome, quando} do Corte guardado, só pra mostrar na barra
+function idbAbrir(){
+  return new Promise((ok,err)=>{
+    if(!window.indexedDB) return err(new Error("navegador sem IndexedDB"));
+    const rq=indexedDB.open(IDB_NOME,1);
+    rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains(IDB_LOJA)) db.createObjectStore(IDB_LOJA); };
+    rq.onsuccess=()=>ok(rq.result);
+    rq.onerror=()=>err(rq.error);
+  });
+}
+// Falha em salvar não pode derrubar o painel (aba anônima, disco cheio, cota): só não guarda.
+function idbPut(chave,val){ return idbAbrir().then(db=>new Promise((ok,err)=>{
+  const tx=db.transaction(IDB_LOJA,"readwrite"); tx.objectStore(IDB_LOJA).put(val,chave);
+  tx.oncomplete=()=>ok(true); tx.onerror=()=>err(tx.error); tx.onabort=()=>err(tx.error);
+})).catch(()=>false); }
+function idbGet(chave){ return idbAbrir().then(db=>new Promise((ok,err)=>{
+  const rq=db.transaction(IDB_LOJA,"readonly").objectStore(IDB_LOJA).get(chave);
+  rq.onsuccess=()=>ok(rq.result||null); rq.onerror=()=>err(rq.error);
+})).catch(()=>null); }
+function idbDel(chave){ return idbAbrir().then(db=>new Promise((ok,err)=>{
+  const tx=db.transaction(IDB_LOJA,"readwrite"); tx.objectStore(IDB_LOJA).delete(chave);
+  tx.oncomplete=()=>ok(true); tx.onerror=()=>err(tx.error);
+})).catch(()=>false); }
+
+function guardaCorte(nome, buf){
+  ARQ_SALVO={nome, quando:Date.now()};
+  idbPut("corte",{nome, buf, quando:ARQ_SALVO.quando}).then(ok=>{ if(!ok) ARQ_SALVO=null; renderSalvoInfo(); });
+  renderSalvoInfo();
+}
+function guardaProduto(nome, buf){
+  PROD_BUFS.push({nome, buf});
+  idbPut("produto", PROD_BUFS);
+  renderSalvoInfo();
+}
+function esqueceSalvos(){
+  ARQ_SALVO=null; PROD_BUFS=[];
+  Promise.all([idbDel("corte"), idbDel("produto")]).then(()=>{ renderSalvoInfo(); location.reload(); });
+}
+function quandoTxt(ms){
+  if(!ms) return "";
+  const d=new Date(ms);
+  return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(-2)
+    +" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function renderSalvoInfo(){
+  const e=document.getElementById("fsalvo"), b=document.getElementById("btn-esquecer");
+  if(!e||!b) return;
+  if(ARQ_SALVO){
+    e.textContent="✓ salvo neste navegador · "+quandoTxt(ARQ_SALVO.quando)
+      + (PROD_BUFS.length?` · +${PROD_BUFS.length} rel. por Produto`:"");
+    b.classList.remove("hidden");
+  } else { e.textContent=""; b.classList.add("hidden"); }
+}
+
 /* ---------- utils ---------- */
 const fmt = n => (n||0).toLocaleString("pt-BR");
 // lista de ordens de produção (Set) -> "12345 / 12346" — a chave pra conferir no ERP
@@ -885,6 +962,65 @@ function materialDaOrdem(ordem){ const p=PECA_MAP[ordem]; return p? materialDe(p
 function casaMat(m, filtro){ return !filtro || (filtro==="SEM" ? !m : m===filtro); }
 // rótulo do filtro, do jeito que o operador lê na folha
 function rotuloMat(filtro){ return filtro==="SEM" ? "Sem material na descrição" : (filtro||""); }
+
+/* ---------- MEDIDA DA PEÇA → m² CORTADO ----------
+   Nenhum dos dois relatórios traz área: o que existe é a MEDIDA dentro da descrição da peça,
+   em milímetros — "670X430X15 MDP 2 BRANCO" é 670 × 430 com 15 de espessura. Então o m² é
+   CALCULADO daí, e vale o que a descrição do ERP disser.
+   Convenção da fábrica (é a que aparece nos arquivos reais): C × L × E, a ESPESSURA é o
+   último número. Com os três, a área são os dois primeiros — "417X14X15MDF7 BCO" é uma tira
+   de 417 × 14, e não 417 × 15.
+   Com só DOIS números a leitura é ambígua ("1740X15" tanto pode ser peça sem largura na
+   descrição quanto medida × espessura): nesse caso só conta se os dois forem medida de
+   verdade (≥ 40 mm). Peça que não passa nessas regras entra como SEM MEDIDA e fica FORA do
+   m² — o painel prefere mostrar cobertura menor a inventar área.
+   O X é lido como separador (não como letra), porque o ERP cola material e espessura no
+   número; e a medida aceita vírgula decimal ("1740,5X300X15"). */
+/* O grupo 1 é só a borda (início da descrição ou um caractere que não é dígito): sem ele,
+   "12345X678" seria lido como "2345 X 678" — número truncado virando medida. As medidas são
+   os grupos 2, 3 e 4. O (?!\d) no fim faz o mesmo do outro lado. */
+const MED_RE=/(^|[^\d,])(\d{2,4}(?:,\d+)?)\s*X\s*(\d{2,4}(?:,\d+)?)(?:\s*X\s*(\d{2,4}(?:,\d+)?))?(?!\d)/;
+const medNum = s => parseFloat(String(s).replace(",","."));
+function medidaDe(desc){
+  const m=MED_RE.exec(String(desc||"").toUpperCase());
+  if(!m) return null;
+  let a=medNum(m[2]), b=medNum(m[3]);
+  const t=(m[4]!==undefined)?medNum(m[4]):null;
+  let esp=t;
+  if(t!==null && a<40 && b>=40 && t>=40){ esp=a; a=b; b=t; }  // veio E × C × L: a área são os dois últimos
+  if(!(a>0)||!(b>0)||a>6000||b>6000) return null;             // fora do que uma chapa comporta
+  if(t===null && (a<40||b<40)) return null;                   // "1740X15": medida sem largura, não é área
+  return {c:a, l:b, esp, m2:a*b/1e6};
+}
+// área de UMA peça, em m² (0 = a descrição não diz a medida)
+function m2DaPeca(desc){ const md=medidaDe(desc); return md? md.m2 : 0; }
+function m2DaOrdem(ordem){ const p=PECA_MAP[ordem]; return p? m2DaPeca(p.desc) : 0; }
+/* m² de um conjunto de operações + a COBERTURA (quantas peças tinham medida legível).
+   A cobertura anda junto com o número em toda a tela: m² de 60% das peças não é o m² do dia. */
+function m2Dos(recs){
+  let m2=0, com=0, sem=0;
+  for(const r of (recs||[])){
+    if(!(r.qtde>0)) continue;
+    const a=m2DaOrdem(r.ordem);
+    if(a){ m2+=a*r.qtde; com+=r.qtde; } else sem+=r.qtde;
+  }
+  return {m2, com, sem, tot:com+sem, pct:(com+sem)?Math.round(com/(com+sem)*100):0};
+}
+// m² de uma lista de peças já agrupadas (as da tabela: {desc, cortado})
+function m2DasPecas(pecas, qtdeDe){
+  let m2=0, com=0, sem=0;
+  for(const p of (pecas||[])){
+    const q=qtdeDe?qtdeDe(p):(p.cortado||0);
+    if(!(q>0)) continue;
+    const a=m2DaPeca(p.desc);
+    if(a){ m2+=a*q; com+=q; } else sem+=q;
+  }
+  return {m2, com, sem, tot:com+sem, pct:(com+sem)?Math.round(com/(com+sem)*100):0};
+}
+// m² na tela/papel: 2 casas, padrão pt-BR. Zero vira "·" pra não poluir a coluna.
+function fmtM2(v){ return (v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function celM2(r){ return r.m2 ? `<td class='num' title='${fmtM2(r.m2)} m² · ${fmt(r.com)} de ${fmt(r.tot)} pç com medida na descrição (${r.pct}%)'>${fmtM2(r.m2)}${r.pct<100?"<span class='m2-parc'>*</span>":""}</td>`
+                               : `<td class='num zero' title='Nenhuma peça desta linha traz a medida na descrição'>·</td>`; }
 
 // meta efetiva de um lote, POR MATERIAL: manual (digitada) tem prioridade sobre a da Programação.
 // Sem material, devolve a data mais tarde entre as duas (o lote só fecha quando as duas saem).
@@ -2106,14 +2242,15 @@ function renderPeca(){
   const byLote=buildPecaLote();
   const lotes=Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b));
   const t=document.getElementById("tbl-peca");
-  let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th>Planejado</th><th>%</th><th>Programada</th><th>Realizada</th><th class='l'>Status</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
-  let anyShown=false, nPecas=0; const mostrados=[];
+  let h="<thead><tr><th class='l'>Peça</th><th>Cortado</th><th title='Área das peças cortadas, calculada da medida (C × L) que vem na descrição — não é consumo de chapa'>m²</th><th>Planejado</th><th>%</th><th>Programada</th><th>Realizada</th><th class='l'>Status</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
+  let anyShown=false, nPecas=0, totM2=0, m2Com=0, m2Sem=0; const mostrados=[];
   for(const lote of lotes){
     let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
     if(q) pecas=pecas.filter(p=>(p.cod+" "+p.desc).toLowerCase().includes(q));
     if(!pecas.length) continue;
     ordenaPecas(pecas, p=>p.cortado);
     anyShown=true; nPecas+=pecas.length; mostrados.push(lote);
+    const R2=m2DasPecas(pecas); totM2+=R2.m2; m2Com+=R2.com; m2Sem+=R2.sem;   // m² do que está na tela
     const totC=pecas.reduce((s,p)=>s+p.cortado,0);
     const desc=(AGG.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     const st=statusFor(lote);
@@ -2131,6 +2268,7 @@ function renderPeca(){
       <td class='l'><span class='pl-lote'>${esc(lote)}</span>${desc?` <span class='pl-desc'>${esc(desc)}</span>`:""}
         <span class='pl-meta'>${pecas.length} peça(s)</span></td>
       <td class='num'>${fmt(totC)}</td>
+      ${celM2(R2)}
       <td class='num ${totP?"":"zero"}'>${totP?fmt(totP):"·"}</td>
       <td class='num'>${pctL}</td>
       <td class='num'>${st.mat?`<span class='mat-tag mat-${st.mat}'>${st.mat}</span>`:""}${progBR}${g.src==="prog"?"<span class='src-prog' title='Data vinda da Programação'>PROG</span>":""}</td>
@@ -2150,6 +2288,7 @@ function renderPeca(){
       h+=`<tr class='peca-row' data-lote='${esc(lote)}'>
         <td class='l'>${mat?`<span class='mat-tag mat-${mat}'>${mat}</span>`:"<span class='mat-vazio'></span>"}<span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(p.ords))}'>ord ${esc(ordsCurto(p.ords))}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
+        ${celM2(m2DasPecas([p]))}
         <td class='num ${p.planejado?"":"zero"}'>${p.planejado?fmt(p.planejado):"·"}</td>
         <td class='num'>${pct}</td>
         <td class='num zero'>${gm.iso?dateToBR(pzm):"—"}</td>
@@ -2179,7 +2318,10 @@ function renderPeca(){
     bt.dataset.abrir = tudoAberto ? "0" : "1"; bt.dataset.chaves = mostrados.map(l=>"lote:"+l).join("|"); }
   const inf=document.getElementById("peca-info");
   if(inf){ const abertos=mostrados.filter(l=>ABERTOS.has("lote:"+l)).length;
-    inf.textContent = mostrados.length ? `${mostrados.length} lote(s) · ${fmt(nPecas)} linha(s) de peça` + (abertos?` · ${abertos} aberto(s)`:" · clique num lote para abrir") : ""; }
+    const pctM2=(m2Com+m2Sem)?Math.round(m2Com/(m2Com+m2Sem)*100):0;
+    inf.textContent = mostrados.length ? `${mostrados.length} lote(s) · ${fmt(nPecas)} linha(s) de peça`
+      + (totM2?` · ${fmtM2(totM2)} m²${pctM2<100?` (${pctM2}% das pç com medida)`:""}`:"")
+      + (abertos?` · ${abertos} aberto(s)`:" · clique num lote para abrir") : ""; }
 }
 
 /* ---------- "Peças cortadas em cada dia": o rastreio da data mostrando a peça ---------- */
@@ -2226,8 +2368,8 @@ function renderPecaData(){
 function renderPdDia(t, info, q, match, dia){
   const dias=buildPecaDia().filter(D=>!dia || D.data===dia);
   const chaves=[];
-  let h="<thead><tr><th class='l'>Peça cortada no dia</th><th class='l'>Lote</th><th>Cortado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
-  let nDias=0, nLinhas=0, totPc=0, nAbertos=0;
+  let h="<thead><tr><th class='l'>Peça cortada no dia</th><th class='l'>Lote</th><th>Cortado</th><th title='Área das peças cortadas no dia, calculada da medida (C × L) da descrição — não é consumo de chapa'>m²</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>";
+  let nDias=0, nLinhas=0, totPc=0, nAbertos=0, totM2=0, m2Com=0, m2Sem=0;
   for(const D of dias){
     let pecas=Object.values(D.pecas).filter(match);
     if(!pecas.length) continue;
@@ -2235,6 +2377,7 @@ function renderPdDia(t, info, q, match, dia){
     const tot=pecas.reduce((s,p)=>s+p.cortado,0);
     const lotes=[...new Set(pecas.map(p=>p.lote))].sort((a,b)=>loteNum(a)-loteNum(b));
     nDias++; nLinhas+=pecas.length; totPc+=tot;
+    const R2=m2DasPecas(pecas); totM2+=R2.m2; m2Com+=R2.com; m2Sem+=R2.sem;   // m² do que está na tela
     const chave="dia:"+D.data; chaves.push(chave);
     const aberto = q ? true : ABERTOS.has(chave);      // com busca, abre quem tem resultado
     if(aberto) nAbertos++;
@@ -2244,6 +2387,7 @@ function renderPdDia(t, info, q, match, dia){
         <span class='pd-meta'>${pecas.length} peça(s)</span></td>
       <td class='l'><span class='pd-lotelist'>${lotes.length} lote(s): ${esc(lotes.join(", "))}</span></td>
       <td class='num'>${fmt(tot)}</td>
+      ${celM2(R2)}
       <td></td><td></td></tr>`;
     if(!aberto) continue;                              // recolhido: nem monta as linhas
     for(const p of pecas){
@@ -2251,6 +2395,7 @@ function renderPdDia(t, info, q, match, dia){
         <td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)} <span class='pd-lotes' title='Ordens de produção: ${esc(ordsStr(p.ords))}'>ord ${esc(ordsCurto(p.ords))}</span></td>
         <td class='l'><span class='lote-name'>${esc(p.lote)}</span></td>
         <td class='num'>${fmt(p.cortado)}</td>
+        ${celM2(m2DasPecas([p]))}
         <td class='l'>${esc([...p.maqs].join(", "))}</td>
         <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
     }
@@ -2258,8 +2403,11 @@ function renderPdDia(t, info, q, match, dia){
   h+="</tbody>";
   if(!nDias) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" cortada"} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
+  const pctM2 = (m2Com+m2Sem) ? Math.round(m2Com/(m2Com+m2Sem)*100) : 0;
   if(info) info.textContent = nDias
-    ? `${nDias} dia(s) · ${fmt(nLinhas)} linha(s) de peça · ${fmt(totPc)} pç` + (nAbertos?` · ${nAbertos} dia(s) aberto(s)`:" · clique num dia para abrir")
+    ? `${nDias} dia(s) · ${fmt(nLinhas)} linha(s) de peça · ${fmt(totPc)} pç`
+      + (totM2?` · ${fmtM2(totM2)} m²${pctM2<100?` (${pctM2}% das pç com medida)`:""}`:"")
+      + (nAbertos?` · ${nAbertos} dia(s) aberto(s)`:" · clique num dia para abrir")
     : "";
   return chaves;
 }
@@ -2569,6 +2717,15 @@ function renderKpis(){
     const set=new Set();
     for(const r of AGG.recs){ if(r.qtde>0 && PECA_MAP[r.ordem]) set.add(PECA_MAP[r.ordem].cod); }
     cards.push({lbl:"Peças cortadas", val:set.size, sub:"tipos", cls:""});
+    // m² cortado: calculado da MEDIDA na descrição da peça. A cobertura vai junto no card —
+    // se metade das peças não traz medida, o m² é de metade da produção e isso tem que aparecer.
+    const A=m2Dos(AGG.recs);
+    if(A.tot) cards.push({lbl:"m² cortado", val:fmtM2(A.m2), sub:A.pct<100?`${A.pct}% das pç com medida`:"área das peças",
+      cls: A.pct>=90?"ok":(A.pct>=60?"warn":"red"),
+      tip:`Área calculada da medida que vem na descrição da peça (C × L, em mm). `+
+          `Entraram ${fmt(A.com)} de ${fmt(A.tot)} pç cortadas (${A.pct}%)`+
+          (A.sem?` — ${fmt(A.sem)} pç ficaram de fora porque a descrição não traz medida legível.`:".")+
+          ` Não é consumo de chapa: é a área das peças, sem perda de corte, refilo nem sobra.`});
   }
   k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'${c.tip?` title='${esc(c.tip)}'`:""}><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
 }
@@ -2598,30 +2755,51 @@ function clearErr(){ document.getElementById("err").classList.add("hidden"); }
 function handleFile(file){
   clearErr();
   const rdr=new FileReader();
-  rdr.onload=ev=>{
-    try{
-      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
-      const {period,recs}=parseWorkbook(wb);
-      if(!recs.length){
-        // auto-detecção: relatório "por Produto" (peças) ou a Programação (datas-meta)
-        const prod=parseProduto(wb);
-        if(prod.n){ applyPeca(prod,file); return; }
-        const prog=parseProgramacao(wb);
-        if(prog.n){ applyProg(prog,file); return; }
-        showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
-        return;
-      }
-      RAW_RECS=recs; LAST_PERIOD=period;
-      AGG=aggregate(recs.filter(r=>!OCULTOS.has(r.lote)));
-      document.getElementById("fname").textContent=file.name;
-      document.getElementById("drop").classList.add("hidden");
-      document.getElementById("painel").classList.remove("hidden");
-      document.getElementById("filebar").style.display="flex";
-      renderAll(period);
-    }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); }
-  };
+  rdr.onload=ev=>{ processaArquivo(file.name, ev.target.result, true); };
   rdr.onerror=()=>showErr("Não consegui abrir o arquivo.");
   rdr.readAsArrayBuffer(file);
+}
+/* Lê os bytes de um .xlsx e descobre o que ele é (Corte, por Produto ou Programação).
+   salvar=true guarda o arquivo no navegador; na restauração vem false — os bytes já vieram de lá. */
+function processaArquivo(nome, buf, salvar){
+  try{
+    const wb=XLSX.read(new Uint8Array(buf),{type:"array"});
+    const {period,recs}=parseWorkbook(wb);
+    if(!recs.length){
+      // auto-detecção: relatório "por Produto" (peças) ou a Programação (datas-meta)
+      const prod=parseProduto(wb);
+      if(prod.n){ applyPeca(prod,{name:nome}); if(salvar) guardaProduto(nome,buf); return true; }
+      const prog=parseProgramacao(wb);
+      if(prog.n){ applyProg(prog,{name:nome}); return true; }   // a Programação já persiste no localStorage
+      showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
+      return false;
+    }
+    RAW_RECS=recs; LAST_PERIOD=period;
+    AGG=aggregate(recs.filter(r=>!OCULTOS.has(r.lote)));
+    document.getElementById("fname").textContent=nome;
+    document.getElementById("drop").classList.add("hidden");
+    document.getElementById("painel").classList.remove("hidden");
+    document.getElementById("filebar").style.display="flex";
+    renderAll(period);
+    if(salvar) guardaCorte(nome,buf);
+    return true;
+  }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); return false; }
+}
+
+/* Na abertura, o painel volta com o último arquivo carregado (Corte + os relatórios por Produto
+   que estavam junto). Se der qualquer problema pra ler o que foi guardado, cai no estado vazio
+   normal — arrastar o arquivo de novo sempre funciona. */
+function restauraSalvos(){
+  idbGet("corte").then(c=>{
+    if(!c||!c.buf) return;
+    if(!processaArquivo(c.nome, c.buf, false)) return;
+    ARQ_SALVO={nome:c.nome, quando:c.quando};
+    renderSalvoInfo();
+    return idbGet("produto").then(list=>{
+      for(const p of (list||[])){ if(p&&p.buf && processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
+      renderSalvoInfo();
+    });
+  }).catch(()=>{});
 }
 
 // aplica as datas da Programação (persiste e re-renderiza).
@@ -2700,32 +2878,45 @@ function applyPeca(prod, file){
 // zera as peças carregadas (pra recomeçar com outro conjunto de relatórios por Produto)
 function limparPecas(){
   PECA_MAP={}; PROD_FILES=[]; PROD_PERIOD="";
+  PROD_BUFS=[]; idbDel("produto").then(renderSalvoInfo);   // não voltam na próxima abertura
   setProdInfo("Peças carregadas limpas.", false);
   if(AGG){ renderKpis(); renderPrazo(); renderMatriz(); renderPeca(); renderPecaData(); }
 }
 function handleProduto(file){
   const rdr=new FileReader();
-  rdr.onload=ev=>{
-    try{
-      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
-      const prod=parseProduto(wb);
-      if(!prod.n){ setProdInfo("⚠ Não achei peças/ORDEM nessa planilha (esperado “Rel Planilhamento por Produto”).", true); return; }
-      applyPeca(prod,file);
-    }catch(err){ setProdInfo("⚠ Erro ao ler o relatório por Produto: "+err.message, true); }
-  };
+  rdr.onload=ev=>{ processaProdutoBuf(file.name, ev.target.result, true); };
   rdr.readAsArrayBuffer(file);
+}
+function processaProdutoBuf(nome, buf, salvar){
+  try{
+    const wb=XLSX.read(new Uint8Array(buf),{type:"array"});
+    const prod=parseProduto(wb);
+    if(!prod.n){ setProdInfo("⚠ Não achei peças/ORDEM nessa planilha (esperado “Rel Planilhamento por Produto”).", true); return false; }
+    applyPeca(prod,{name:nome});
+    if(salvar) guardaProduto(nome,buf);
+    return true;
+  }catch(err){ setProdInfo("⚠ Erro ao ler o relatório por Produto: "+err.message, true); return false; }
 }
 
 /* export csv */
+// m² no CSV: decimal com vírgula (o Excel BR abre com ";" e vírgula) · 0 sai em branco
+function csvM2(v){ return v? (Math.round(v*100)/100).toFixed(2).replace(".",",") : ""; }
+// aviso de cobertura nas linhas de total: só quando existe m² e ele é de PARTE das peças
+function notaM2(R){ return (R.m2 && R.pct<100) ? `${R.pct}% das pç com medida` : ""; }
 function exportCsv(){
   if(!AGG) return;
   const rows=[];
+  const temM2=Object.keys(PECA_MAP).length>0;   // sem o relatório por Produto não há medida, logo não há m²
+  const colM2=t=>temM2?[t]:[];
   const ANT=antecipadoPorDia(AGG.recs);
   let totAnt=0; for(const k in ANT) totAnt+=ANT[k].ant;
-  rows.push(["Data", ...AGG.lotes, "Lotes no dia", "Lotes futuros", "Antecipado (pç antes da prevista)", "Total dia"]);
-  for(const m of MATS) rows.push(["Prevista "+m, ...AGG.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", "", "", ""]);
-  for(const d of AGG.datas){ const A=ANT[d]||{ant:0,lotesFut:0}; rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), lotesNoDia(d), A.lotesFut, A.ant, AGG.dataT[d]]); }
-  rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.lotes.length, "", totAnt, AGG.grand]);
+  rows.push(["Data", ...AGG.lotes, "Lotes no dia", "Lotes futuros", "Antecipado (pç antes da prevista)", "Total dia", ...colM2("m² do dia")]);
+  for(const m of MATS) rows.push(["Prevista "+m, ...AGG.lotes.map(l=>{ const g=getMeta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; }), "", "", "", "", ...colM2("")]);
+  for(const d of AGG.datas){ const A=ANT[d]||{ant:0,lotesFut:0};
+    rows.push([d, ...AGG.lotes.map(l=>AGG.mat[d+"|"+l]||0), lotesNoDia(d), A.lotesFut, A.ant, AGG.dataT[d],
+               ...colM2(csvM2(m2Dos(AGG.recs.filter(r=>r.data===d)).m2))]); }
+  rows.push(["Total cortado", ...AGG.lotes.map(l=>AGG.loteT[l]), AGG.lotes.length, "", totAnt, AGG.grand,
+             ...colM2(csvM2(m2Dos(AGG.recs).m2))]);
   rows.push([]);
   rows.push(["Lote","Cortado","1º corte","Último corte","Dias de corte","Dias parado no meio","Cortado em cada dia","Prevista MDF","Prevista MDP","Prazo","Status"]);
   for(const l of AGG.lotes){
@@ -2778,25 +2969,34 @@ function exportCsv(){
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças cortadas por lote"]);
-    rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens","Cortado","Planejado","Data programada","Último corte","Máquina","Operador"]);
+    rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens","Cortado","m² cortado","Medida (C x L mm)","Planejado","Data programada","Último corte","Máquina","Operador"]);
     const byLote=buildPecaLote();
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=getMeta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        rows.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        const md=medidaDe(p.desc);
+        rows.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, csvM2(m2DaPeca(p.desc)*p.cortado),
+                   md?`${md.c} x ${md.l}`:"", p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
+      const R=m2DasPecas(pecas);
+      rows.push([lote, "", "(total do lote)", "", pecas.reduce((s,p)=>s+p.cortado,0), csvM2(R.m2),
+                 notaM2(R), pecas.reduce((s,p)=>s+(p.planejado||0),0), "", "", "", ""]);
     }
     // rastreio da data com a peça: o que saiu em cada dia
     rows.push([]);
     rows.push(["Peças cortadas em cada dia"]);
-    rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","Máquina","Operador"]);
+    rows.push(["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","m² cortado","Medida (C x L mm)","Máquina","Operador"]);
     for(const D of buildPecaDia()){
-      for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
-        rows.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      const pecasD=ordenaPecas(Object.values(D.pecas), p=>p.cortado);
+      for(const p of pecasD){
+        const md=medidaDe(p.desc);
+        rows.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado,
+                   csvM2(m2DaPeca(p.desc)*p.cortado), md?`${md.c} x ${md.l}`:"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
-      rows.push(["", "", "", "Total do dia", "", "", D.tot, "", ""]);
+      const R=m2DasPecas(pecasD);
+      rows.push(["", "", "", "Total do dia", "", "", D.tot, csvM2(R.m2), notaM2(R), "", ""]);
     }
   }
   const csv=rows.map(r=>r.map(c=>{ const s=String(c??""); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(";")).join("\n");
@@ -2804,6 +3004,9 @@ function exportCsv(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="consolidacao_corte.csv"; a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/* no .xlsx o m² vai como NÚMERO (dá pra somar na planilha), com 2 casas · 0 sai em branco */
+function xlM2(v){ return v? Math.round(v*100)/100 : ""; }
 
 /* export .xlsx com uma aba por operador (+ aba Consolidado com todos) */
 function exportPorOperador(){
@@ -2905,34 +3108,41 @@ function exportPorOperador(){
       const K=kpisDoLote(lote);
       if(K) ck.push(["% no prazo", K.pNoPrazo+"%", "% adiantado", K.pAntes+"%", "% atrasado", K.pDepois+"%",
                      "Desvio médio", fmtDesvio(K.medio), "Janela", fmtDvInt(K.minDv)+" a "+fmtDvInt(K.maxDv)+" d"]);
-      ck.push(["Peça (código)","Descrição","Ordens","Material","Prevista","Realizada","Planejado","Cortado","Falta","OK"]);
+      ck.push(["Peça (código)","Descrição","Ordens","Material","Medida (C x L mm)","Prevista","Realizada","Planejado","Cortado","m² cortado","Falta","OK"]);
       for(const p of pecas){
         const mat=materialDe(p.desc), gm=getMeta(lote, mat||undefined);
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        ck.push([p.cod, p.desc, ordsStr(p.ords), mat||"—", gm.iso?dateToBR(isoToDate(gm.iso)):"—", ult?dateToBR(ult):"—",
-                 p.planejado||0, p.cortado, saldoDe(p), ""]);
+        const md=medidaDe(p.desc);
+        ck.push([p.cod, p.desc, ordsStr(p.ords), mat||"—", md?`${md.c} x ${md.l}`:"—",
+                 gm.iso?dateToBR(isoToDate(gm.iso)):"—", ult?dateToBR(ult):"—",
+                 p.planejado||0, p.cortado, xlM2(m2DaPeca(p.desc)*p.cortado), saldoDe(p), ""]);
       }
-      ck.push(["","Total","","","","", totP, totC, totF, ""]);
+      const Rk=m2DasPecas(pecas);
+      ck.push(["","Total","","",notaM2(Rk),"","", totP, totC, xlM2(Rk.m2), totF, ""]);
       ck.push([]);
     }
     if(ck.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ck), "Checklist por lote");
 
     // aba: o que foi cortado em cada dia, peça a peça (mesma leitura da tela)
-    const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","Máquina","Operador"]];
+    const dd=[["Data","Dia da semana","Peça (código)","Peça (descrição)","Ordens","Lote","Cortado","m² cortado","Medida (C x L mm)","Máquina","Operador"]];
     for(const D of buildPecaDia()){
-      for(const p of ordenaPecas(Object.values(D.pecas), p=>p.cortado)){
-        dd.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado, [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+      const pecasD=ordenaPecas(Object.values(D.pecas), p=>p.cortado);
+      for(const p of pecasD){
+        const md=medidaDe(p.desc);
+        dd.push([D.data, diaSemana(D.data), p.cod, p.desc, ordsStr(p.ords), p.lote, p.cortado,
+                 xlM2(m2DaPeca(p.desc)*p.cortado), md?`${md.c} x ${md.l}`:"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
-      dd.push(["","","","Total do dia","","",D.tot,"",""]);
+      const R=m2DasPecas(pecasD);
+      dd.push(["","","","Total do dia","","",D.tot, xlM2(R.m2), notaM2(R), "", ""]);
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dd), "Peças por dia");
 
     // aba: matriz data × peça (uma coluna por dia)
     const M=buildPecaMatriz();
-    const mx=[["Lote","Peça (código)","Peça (descrição)", ...M.datas, "Total"]];
+    const mx=[["Lote","Peça (código)","Peça (descrição)", ...M.datas, "Total", "m² cortado"]];
     const ordenadas=ordenaPecas(M.rows.slice(), r=>r.tot);
-    for(const r of ordenadas) mx.push([r.lote, r.cod, r.desc, ...M.datas.map(d=>r.byData[d]||0), r.tot]);
-    mx.push(["Total do dia","","", ...M.datas.map(d=>M.dataT[d]||0), M.grand]);
+    for(const r of ordenadas) mx.push([r.lote, r.cod, r.desc, ...M.datas.map(d=>r.byData[d]||0), r.tot, xlM2(m2DaPeca(r.desc)*r.tot)]);
+    mx.push(["Total do dia","","", ...M.datas.map(d=>M.dataT[d]||0), M.grand, xlM2(m2Dos(AGG.recs).m2)]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mx), "Data x Peça");
   }
   XLSX.writeFile(wb, "rastreio_por_operador.xlsx");
@@ -2958,6 +3168,10 @@ document.getElementById("trocar").addEventListener("click",()=>{
   document.getElementById("drop").classList.remove("hidden");
   fileInput.value=""; AGG=null;
 });
+// apaga o que está guardado no navegador e recarrega vazio
+document.getElementById("btn-esquecer").addEventListener("click",esqueceSalvos);
+// e, na abertura, o painel volta com o último arquivo carregado
+restauraSalvos();
 document.getElementById("export").addEventListener("click",exportCsv);
 document.getElementById("btn-xlsx").addEventListener("click",exportPorOperador);
 document.getElementById("op-filter").addEventListener("change",e=>{

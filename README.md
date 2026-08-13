@@ -92,6 +92,26 @@ arrasta o arquivo na tela e o painel monta na hora:
 - **Clique numa quantidade da matriz** — abre quais peças saíram naquele dia naquele lote, com
   máquina e operador, e diz **a quantos dias da data programada** aquilo foi cortado (serve pra
   explicar corte solto fora da janela do lote, tipo aproveitamento de chapa).
+- **m² cortado** — quanto de **área** saiu, e não só quantas peças. O painel calcula a área a partir
+  da **medida que já vem na descrição da peça** (`670X430X15` = 670 × 430 mm, 15 de espessura), soma
+  `área × quantidade cortada` e mostra: um **KPI** no topo, uma **coluna m²** em *Peças cortadas por
+  lote* (por peça e por lote) e outra em *Peças cortadas em cada dia* (por peça e o **total do dia**),
+  além das colunas nos arquivos exportados (com a medida usada, pra conferir). Precisa do
+  **relatório por Produto** carregado — é ele que traz a descrição.
+  **Duas coisas pra ler certo:** (1) é a **área líquida das peças**, e **não consumo de chapa** — não
+  entra perda de corte, refilo nem sobra, então o consumo real é sempre maior; (2) peça cuja descrição
+  **não traz medida legível fica de fora**, e o painel diz sempre **qual fatia das peças entrou na
+  conta** (`86% das pç com medida`); o `*` ao lado do número marca a linha que tem peça sem medida.
+  A leitura da medida segue a convenção `C × L × E` (a espessura é o último número), aguenta o
+  material colado no número (`417X14X15MDF7`), vírgula decimal (`1740,5X300X15`) e a forma invertida
+  `E × C × L` (`15X2750X1850`).
+- **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
+  carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
+  novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra
+  `✓ salvo neste navegador` com a data/hora, e o botão **“Esquecer arquivo salvo”** apaga tudo e volta
+  pra tela vazia. Continua sendo tudo local: o arquivo **não é enviado pra lugar nenhum**, fica só na
+  máquina de quem carregou (em navegador anônimo ou com o disco cheio ele simplesmente não é salvo, e
+  o painel funciona como antes).
 - **Exportar** — baixa a consolidação em `.csv` (com o detalhe por peça e o que saiu em cada dia)
   ou `.xlsx` (uma aba por operador + abas **Peças por lote**, **Checklist por lote**, **Peças por dia**
   e **Data x Peça**). A aba **Checklist por lote** é a versão planilha da ficha: um bloco por lote com
