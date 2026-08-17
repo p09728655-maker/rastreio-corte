@@ -355,6 +355,40 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 #modal-corpo td{white-space:normal}          /* operador/máquina quebram em vez de cortar */
 #modal-corpo td:first-child{min-width:280px}
 
+/* ---- Furação: mesma linguagem visual da matriz e do prazo do corte, escopada nos ids fur —
+   nada aqui toca nos seletores das tabelas do corte ---- */
+#tbl-fur-matriz td:first-child,#tbl-fur-prazo td:first-child{
+  position:sticky;left:0;background:var(--surface);z-index:1;box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-fur-matriz th:first-child,#tbl-fur-prazo th:first-child{
+  position:sticky;left:0;background:var(--elevated);z-index:3;box-shadow:8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-fur-matriz td:last-child{position:sticky;right:0;background:var(--surface);z-index:1;box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-fur-matriz th:last-child{position:sticky;right:0;background:var(--elevated);z-index:3;box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
+#tbl-fur-matriz .trtot td:first-child,#tbl-fur-matriz .trtot td:last-child{background:var(--elevated);z-index:2}
+#tbl-fur-matriz tbody tr:hover td:first-child,#tbl-fur-matriz tbody tr:hover td:last-child,
+#tbl-fur-prazo tbody tr:hover td:first-child{background:#191919}
+#tbl-fur-matriz .trprog th{text-transform:none;letter-spacing:0;font-size:11px;padding:5px 14px;
+  border-bottom:1px solid var(--border);z-index:3}
+#tbl-fur-matriz .trprog th:first-child{font-size:9px;text-transform:uppercase;letter-spacing:1px;z-index:4}
+#tbl-fur-matriz .trprog .prog-on{color:var(--txt)}
+#tbl-fur-matriz .trprog .prog-off{color:var(--txt3)}
+#tbl-fur-matriz .trprog th.dv-ok{color:var(--ok)}
+#tbl-fur-matriz .trprog th.dv-red{color:var(--red)}
+#tbl-fur-matriz td.cel-meta{box-shadow:inset 0 0 0 1px rgba(255,92,31,.55)}
+#tbl-fur-matriz .trprog .prog-lin{display:flex;align-items:center;justify-content:flex-end;gap:4px;line-height:1.5}
+#tbl-fur-matriz .trprog .prog-lin .mat-tag{margin-right:0}
+#tbl-fur-matriz td.tem-peca{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
+  text-underline-offset:3px;text-decoration-color:var(--txt3)}
+#tbl-fur-matriz td.tem-peca:hover{color:var(--acc);text-decoration-color:var(--acc)}
+#tbl-fur-prazo .st-mat{display:flex;align-items:center;gap:6px;margin-bottom:4px;white-space:nowrap}
+#tbl-fur-prazo .st-nota{font-family:var(--font-d);font-size:9.5px;color:var(--txt3);margin-top:4px;white-space:normal;max-width:220px}
+#tbl-fur-prazo .dias-cell{white-space:normal;min-width:190px;max-width:340px}
+#tbl-fur-prazo .dias-list{font-family:var(--font-d);font-size:10.5px;color:var(--txt2);margin-top:4px;line-height:1.6}
+#tbl-fur-prazo .dias-list b{color:var(--txt);font-weight:600}
+/* modal em modo furação: os botões de ficha de corte não fazem sentido ali */
+#modal.fur .mf-btn,#modal.fur .mf-lbl{display:none}
+/* sem arquivo de furação carregado, as seções dela não vão pro PDF do painel */
+@media print{ section.fur-vazia{display:none} }
+
 /* ---- ficha de corte (só existe no papel) ---- */
 #ficha{display:none}
 .fx-pg{page-break-after:always;break-after:page}
@@ -757,6 +791,32 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
       <div class="tbl-wrap"><table id="tbl-func"></table></div>
     </section>
 
+    <section id="sec-furmatriz" class="fur-vazia">
+      <h2>Furado por lote &amp; data <span class="tag">furadeiras · matriz data × lote</span></h2>
+      <div class="sec-sub">O rastreio das <b>furadeiras</b>, no mesmo formato do corte — e <b>sem mexer em nada do corte</b>: operação de furadeira nunca entra nos números dele.
+        A <b>data prevista da furação é a data de corte do material + 1 dia útil</b>
+        (MDF corta 17/08 → fura 18/08 · MDP corta 19/08 → fura 20/08) — ela é calculada sozinha da Programação (ou da data manual) do corte, não tem planilha nova pra carregar.
+        Carregue o <b>“Rel Planilhamento por Funcionário” da furação</b> (máquinas FUR): pode <b>arrastar na tela</b>, igual ao do corte — o painel reconhece pela máquina e separa sozinho.
+        Com o <b>“Rel Planilhamento por Produto” da furação</b> carregado também (botão da seção Peças, ou arraste), a quantidade vira <b>clicável</b> — mostra <b>quais peças foram furadas</b> naquele dia — e o status separa <b>MDF de MDP</b>.</div>
+      <div class="prazo-actions">
+        <button class="linkbtn" id="btn-fur" style="margin:0">⇩ Carregar relatório da Furação (.xlsx)</button>
+        <span id="fur-info" class="prog-info"></span>
+        <input type="file" id="file-fur" accept=".xlsx,.xls" class="hidden">
+      </div>
+      <div id="fur-vazio" class="sec-sub">Nenhum relatório de furação carregado ainda — arraste na tela o <b>“Rel Planilhamento por Funcionário” das furadeiras</b> (ou use o botão acima). Ele fica salvo neste navegador e volta sozinho, como o do corte.</div>
+      <div class="kpis" id="fur-kpis"></div>
+      <div class="tbl-wrap" id="fur-mx-wrap" style="display:none"><table id="tbl-fur-matriz"></table></div>
+    </section>
+
+    <section id="sec-furprazo" class="fur-vazia">
+      <h2>Prazo de furação por lote <span class="tag">corte + 1 dia útil</span></h2>
+      <div class="sec-sub">A <b>prevista da furação</b> de cada material é a data de corte dele <b>+ 1 dia útil</b> (sábado e domingo pulam; feriado conta — o painel não tem o calendário da fábrica).
+        Ela acompanha sozinha a Programação e as datas manuais digitadas no <b>Prazo por lote</b> do corte — aqui não tem data pra digitar.
+        O status compara o <b>último dia furado</b> com essa prevista, na mesma régua do corte: 🟢 <b>Adiantado</b> / <b>No dia</b> · 🔴 <b>Atrasado</b> · 🟡 <b>Em andamento</b> — desvios em dias úteis.
+        Lote oculto no Prazo por lote do corte some daqui também.</div>
+      <div class="tbl-wrap" id="fur-pz-wrap" style="display:none"><table id="tbl-fur-prazo"></table></div>
+    </section>
+
     <div class="foot-actions">
       <button class="linkbtn" id="btn-pdf" style="margin:0">🖨️ Gerar relatório em PDF</button>
       <button class="linkbtn" id="btn-xlsx" style="margin:0">⬇ Exportar por operador (.xlsx)</button>
@@ -823,6 +883,7 @@ function salvaOcultos(){ try{ localStorage.setItem(LS_OCULTOS, JSON.stringify([.
 function aplicaOcultos(){
   if(!RAW_RECS.length) return;
   AGG = aggregate(RAW_RECS.filter(r=>!OCULTOS.has(r.lote)));
+  if(RAW_RECS_FUR.length) AGGF = aggregate(RAW_RECS_FUR.filter(r=>!OCULTOS.has(r.lote)));
   renderAll(LAST_PERIOD);
 }
 let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
@@ -875,9 +936,15 @@ function guardaProduto(nome, buf){
   idbPut("produto", PROD_BUFS);
   renderSalvoInfo();
 }
+// relatório da FURAÇÃO (por Funcionário do setor FUR): guarda à parte, sem tocar no do corte
+function guardaFur(nome, buf){
+  ARQ_FUR={nome, quando:Date.now()};
+  idbPut("fur",{nome, buf, quando:ARQ_FUR.quando}).then(ok=>{ if(!ok) ARQ_FUR=null; renderSalvoInfo(); });
+  renderSalvoInfo();
+}
 function esqueceSalvos(){
-  ARQ_SALVO=null; PROD_BUFS=[];
-  Promise.all([idbDel("corte"), idbDel("produto")]).then(()=>{ renderSalvoInfo(); location.reload(); });
+  ARQ_SALVO=null; PROD_BUFS=[]; ARQ_FUR=null;
+  Promise.all([idbDel("corte"), idbDel("produto"), idbDel("fur")]).then(()=>{ renderSalvoInfo(); location.reload(); });
 }
 function quandoTxt(ms){
   if(!ms) return "";
@@ -888,9 +955,11 @@ function quandoTxt(ms){
 function renderSalvoInfo(){
   const e=document.getElementById("fsalvo"), b=document.getElementById("btn-esquecer");
   if(!e||!b) return;
-  if(ARQ_SALVO){
-    e.textContent="✓ salvo neste navegador · "+quandoTxt(ARQ_SALVO.quando)
-      + (PROD_BUFS.length?` · +${PROD_BUFS.length} rel. por Produto`:"");
+  if(ARQ_SALVO||ARQ_FUR){
+    e.textContent=(ARQ_SALVO?"✓ salvo neste navegador · "+quandoTxt(ARQ_SALVO.quando)
+                            :"✓ furação salva neste navegador · "+quandoTxt(ARQ_FUR.quando))
+      + (PROD_BUFS.length?` · +${PROD_BUFS.length} rel. por Produto`:"")
+      + (ARQ_SALVO&&ARQ_FUR?" · + furação":"");
     b.classList.remove("hidden");
   } else { e.textContent=""; b.classList.add("hidden"); }
 }
@@ -1513,7 +1582,7 @@ function renderPrazo(){
     inp.addEventListener("change",e=>{
       const chave=LS_PRAZO+e.target.dataset.lote+":"+e.target.dataset.mat, v=e.target.value;
       if(v) localStorage.setItem(chave,v); else localStorage.removeItem(chave);
-      renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
+      renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData(); renderFur();
     });
   });
   // ocultar lote / reexibir — refaz o AGG sem os ocultos e re-renderiza tudo
@@ -1801,7 +1870,7 @@ function abrirDetalhe(data, lote){
   document.getElementById("modal-corpo").innerHTML=h;
   document.getElementById("modal").classList.remove("hidden");
 }
-function fecharModal(){ document.getElementById("modal").classList.add("hidden"); }
+function fecharModal(){ const m=document.getElementById("modal"); m.classList.add("hidden"); m.classList.remove("fur"); }
 
 // preenche o seletor de operador (código) da matriz
 function renderOpFilter(){
@@ -2538,6 +2607,247 @@ function renderPulmao(){
   });
 }
 
+/* ================= FURAÇÃO =================
+   Rastreio das furadeiras, em PARALELO ao corte e sem mexer nele. O relatório é o mesmo
+   "Rel Planilhamento por Funcionário", só que do setor de furação — a diferença é a máquina
+   (FUR04 / "FURADEIRA F-400 CS" em vez de SEC…). O painel reconhece pelo nome/código da
+   máquina e separa sozinho: operação de furadeira NUNCA entra nos números do corte.
+   A data prevista da furação não vem de planilha nenhuma: é a data de corte do material
+   + 1 DIA ÚTIL (MDF corta 17/08 → fura 18/08 · MDP corta 19/08 → fura 20/08).
+   O "por Produto" da furação entra pelo MESMO caminho do corte (PECA_MAP soma por ORDEM,
+   e ordens de setores diferentes não se atropelam) — é ele que dá peça e material. */
+let RAW_RECS_FUR=[];   // operações de furação, ANTES do filtro de lotes ocultos
+let AGGF=null;         // agregado da furação (mesmo formato do AGG)
+let FUR_NOME="";       // nome do arquivo carregado (pra barra de info da seção)
+let ARQ_FUR=null;      // {nome, quando} guardado no navegador
+const isFurMaq   = m => /FURADEIRA|^FUR\s*\d/i.test(String(m||""));
+const isCorteMaq = m => /SECCIONADORA|^SEC\s*\d/i.test(String(m||""));
+
+// ISO + n dias úteis (pula sábado e domingo; feriado conta — sem o calendário da fábrica)
+function addDiasUteisISO(iso, n){
+  const d=isoToDate(iso); if(!d) return "";
+  let k=0;
+  while(k<n){ d.setDate(d.getDate()+1); const wd=d.getDay(); if(wd!==0&&wd!==6) k++; }
+  return cellToISO(d);
+}
+// meta da FURAÇÃO de um lote/material = meta do CORTE + 1 dia útil (herda manual/Programação).
+// Sem material: vale a mais tarde entre as duas, igual ao getMeta do corte.
+function getMetaFur(lote, mat){
+  if(mat){
+    const g=getMeta(lote, mat);
+    return g.iso? {iso:addDiasUteisISO(g.iso,1), src:g.src, mat} : {iso:"", src:null, mat};
+  }
+  const ms=MATS.map(m=>getMetaFur(lote,m)).filter(x=>x.iso);
+  if(!ms.length) return {iso:"", src:null};
+  ms.sort((a,b)=>a.iso<b.iso?1:-1);
+  return ms[0];
+}
+// materiais que o lote tem NA FURAÇÃO (pelas peças) — vazio sem o por Produto da furação
+function materiaisDoLoteFur(lote){
+  const set=new Set();
+  for(const r of (AGGF?AGGF.recs:[])){ if(r.lote!==lote) continue; const m=materialDaOrdem(r.ordem); if(m) set.add(m); }
+  return MATS.filter(m=>set.has(m));
+}
+function datasDoLoteFur(lote, mat){
+  const ds=[];
+  for(const r of (AGGF?AGGF.recs:[])){
+    if(r.lote!==lote) continue;
+    if(mat && materialDaOrdem(r.ordem)!==mat) continue;
+    const d=brToDate(r.data); if(d) ds.push(d);
+  }
+  return ds.sort((a,b)=>a-b);
+}
+// Status da furação de um lote — o espelho do statusFor do corte, cobrado contra corte + 1 dia útil.
+function statusForFur(lote, mat){
+  if(!mat){
+    const ms=materiaisDoLoteFur(lote);
+    if(ms.length){
+      const sts=ms.map(m=>statusForFur(lote,m)).filter(s=>s.iso);
+      if(sts.length){ sts.sort((a,b)=>(b.desvio??-1e9)-(a.desvio??-1e9)); return sts[0]; }
+    }
+  }
+  const meta=getMetaFur(lote, mat);
+  const prazo=isoToDate(meta.iso);
+  const dias=datasDoLoteFur(lote, mat);
+  const last=dias.length?dias[dias.length-1]:null, first=dias.length?dias[0]:null;
+  let cls="b-mute", txt="Sem data", delta="", desvio=null;
+  if(prazo){
+    if(last){
+      desvio=diasUteisEntre(last,prazo);
+      if(desvio>0)       { cls="b-red";  txt="Atrasado";  delta=desvio+(desvio===1?" dia útil atrasado":" dias úteis atrasado"); }
+      else if(desvio===0){ cls="b-ok";   txt="No dia";    delta="furado no dia"; }
+      else               { const d=-desvio; cls="b-ok"; txt="Adiantado"; delta=d+(d===1?" dia útil adiantado":" dias úteis adiantado"); }
+    } else if(prazo>=todayMidday()){
+      const d=diasUteisEntre(prazo,todayMidday());
+      cls="b-warn"; txt="Em andamento"; delta=d===0?"prazo é hoje":("faltam "+d+(d===1?" dia útil":" dias úteis"));
+    } else {
+      const d=diasUteisEntre(todayMidday(),prazo);
+      cls="b-red"; txt="Não furado"; delta="venceu há "+d+(d===1?" dia útil":" dias úteis");
+    }
+  }
+  let foraJanela=false;
+  const iniArq=(AGGF&&AGGF.datas.length)?brToDate(AGGF.datas[0]):null;
+  if(prazo&&iniArq&&prazo<iniArq){
+    foraJanela=true; cls="b-warn"; txt="Fora da janela";
+    delta=`meta ${dateToBR(prazo)} é anterior ao arquivo (começa ${AGGF.datas[0]})`;
+  }
+  return {iso:meta.iso,prazo,first,last,cls,txt,delta,desvio,foraJanela,src:meta.src,mat:mat||meta.mat||""};
+}
+// Em quantos dias o lote foi furado — mesma leitura do "Dias de corte"
+function diasDoLoteFur(lote){
+  const datas=AGGF.datas.filter(d=>(AGGF.mat[d+"|"+lote]||0)>0);
+  const dist=datas.map(d=>({data:d, qtde:AGGF.mat[d+"|"+lote]}));
+  let parados=0;
+  if(datas.length>1){
+    const ini=brToDate(datas[0]), fim=brToDate(datas[datas.length-1]), set=new Set(datas);
+    for(const d of AGGF.datas){ const dd=brToDate(d); if(dd>=ini&&dd<=fim&&!set.has(d)) parados++; }
+  }
+  const n=datas.length;
+  let cls="b-mute", txt="—";
+  if(n===1)    { cls="b-mute"; txt="1 dia"; }
+  else if(n>1) { cls=parados?"b-red":"b-warn"; txt=n+" dias"+(parados?` · parou ${parados}`:" seguidos"); }
+  return {datas,dist,n,parados,cls,txt};
+}
+
+function renderFur(){
+  const s1=document.getElementById("sec-furmatriz"), s2=document.getElementById("sec-furprazo");
+  if(!s1||!s2) return;
+  const info=document.getElementById("fur-info"), vazio=document.getElementById("fur-vazio");
+  if(!AGGF || !AGGF.datas.length){
+    s1.classList.add("fur-vazia"); s2.classList.add("fur-vazia");
+    vazio.style.display="";
+    document.getElementById("fur-mx-wrap").style.display="none";
+    document.getElementById("fur-pz-wrap").style.display="none";
+    document.getElementById("fur-kpis").innerHTML="";
+    info.textContent="";
+    return;
+  }
+  s1.classList.remove("fur-vazia"); s2.classList.remove("fur-vazia");
+  vazio.style.display="none";
+  document.getElementById("fur-mx-wrap").style.display="";
+  document.getElementById("fur-pz-wrap").style.display="";
+  let cob=0, tot=0;
+  for(const r of AGGF.recs){ if(r.qtde>0){ tot++; if(PECA_MAP[r.ordem]) cob++; } }
+  info.textContent=`✓ ${FUR_NOME||"furação carregada"} · Período: ${periodoDosDados(AGGF.datas)} · ${AGGF.datas.length} dia(s) · ${fmt(AGGF.grand)} pç furadas`+
+    (Object.keys(PECA_MAP).length?` · ${cob}/${tot} operações com peça identificada`:" · carregue o por Produto da furação pra ver peça e material");
+  renderFurKpis(); renderFurMatriz(); renderFurPrazo();
+}
+function renderFurKpis(){
+  const k=document.getElementById("fur-kpis"); if(!k||!AGGF) return;
+  let atras=0, semMeta=0;
+  for(const l of AGGF.lotes){ const s=statusForFur(l); if(s.cls==="b-red") atras++; if(!s.iso) semMeta++; }
+  const cards=[
+    {lbl:"Total furado", val:fmt(AGGF.grand), sub:"peças", cls:""},
+    {lbl:"Lotes", val:AGGF.lotes.length, cls:""},
+    {lbl:"Funcionários", val:AGGF.funcs.length, cls:""},
+    {lbl:"Dias no arquivo", val:AGGF.datas.length, cls:""},
+    {lbl:"Lotes atrasados", val:atras, sub:"vs corte + 1 dia útil", cls:atras?"red":"ok"},
+    {lbl:"Sem prevista", val:semMeta, sub:semMeta?"sem data de corte":"", cls:semMeta?"warn":"ok"},
+  ];
+  k.innerHTML=cards.map(c=>`<div class='kpi ${c.cls}'><div class='lbl'>${c.lbl}</div><div class='val'>${c.val}${c.sub?` <small>${c.sub}</small>`:""}</div></div>`).join("");
+}
+function renderFurMatriz(){
+  const t=document.getElementById("tbl-fur-matriz"); if(!t||!AGGF) return;
+  const M=AGGF;
+  const temPecas=Object.keys(PECA_MAP).length>0;
+  let h="<thead><tr><th class='l'>Data</th>";
+  for(const l of M.lotes) h+=`<th title='${esc(l)}'>${esc(l)}</th>`;
+  h+="<th title='Quantos lotes diferentes tiveram furação na data'>Lotes no dia</th><th>Total dia</th></tr>";
+  // 2ª linha do cabeçalho: quando cada lote DEVERIA estar furado (corte do material + 1 dia útil)
+  h+="<tr class='trprog'><th class='l'>Prevista MDF / MDP</th>";
+  for(const l of M.lotes){
+    const linhas=MATS.map(m=>{
+      const g=getMetaFur(l,m); if(!g.iso) return "";
+      const sm=statusForFur(l,m);
+      const cor=sm.desvio===null||sm.desvio===undefined?"":(sm.desvio>0?" dv-red":" dv-ok");
+      return `<div class='prog-lin${cor}'><span class='mat-tag mat-${m}'>${m}</span>${dateToBR(isoToDate(g.iso))}</div>`;
+    }).filter(Boolean).join("");
+    h+=`<th class='${linhas?"prog-on":"prog-off"}' title='${esc(l)} · prevista da furação = data de corte do material + 1 dia útil'>${linhas||"—"}</th>`;
+  }
+  h+="<th></th><th></th></tr></thead><tbody>";
+  for(const d of M.datas){
+    h+=`<tr><td class='l num'>${d}</td>`;
+    for(const l of M.lotes){
+      const v=M.mat[d+"|"+l]||0;
+      const alvo=MATS.some(m=>{ const iso=getMetaFur(l,m).iso; return iso && dateToBR(isoToDate(iso))===d; })?" cel-meta":"";
+      const clic=(v&&temPecas);
+      const attrs=clic?` data-d="${esc(d)}" data-l="${esc(l)}" title="Clique para ver quais peças foram furadas"`:"";
+      h+=`<td class="num ${v?"":"zero"}${alvo}${clic?" tem-peca":""}"${attrs}>${v?fmt(v):"·"}</td>`;
+    }
+    h+=`<td class='num'>${lotesNoDia(d,M)}</td><td class='num'>${fmt(M.dataT[d])}</td></tr>`;
+  }
+  h+="<tr class='trtot'><td class='l'>Total furado</td>";
+  for(const l of M.lotes) h+=`<td>${fmt(M.loteT[l])}</td>`;
+  h+=`<td>${M.lotes.length}</td><td>${fmt(M.grand)}</td></tr></tbody>`;
+  t.innerHTML=h;
+  const h1=t.querySelector("thead tr").offsetHeight;
+  t.querySelectorAll("thead .trprog th").forEach(th=>{ th.style.top=h1+"px"; });
+}
+function renderFurPrazo(){
+  const t=document.getElementById("tbl-fur-prazo"); if(!t||!AGGF) return;
+  const temPecas=Object.keys(PECA_MAP).length>0;
+  let h="<thead><tr><th class='l'>Lote</th><th>Furado</th><th>1ª furação</th><th>Última furação</th><th class='l'>Dias de furação</th>"+
+        "<th class='l'>Prevista MDF <small>(corte + 1 útil)</small></th><th class='l'>Prevista MDP <small>(corte + 1 útil)</small></th><th class='l'>Status por material</th></tr></thead><tbody>";
+  for(const lote of AGGF.lotes){
+    const s=statusForFur(lote);
+    const desc=(AGGF.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+    const D=diasDoLoteFur(lote);
+    const temMat=materiaisDoLoteFur(lote);
+    h+=`<tr>
+      <td class='l'><span class='lote-name'>${esc(lote)}</span>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
+      <td class='num ${AGGF.loteT[lote]?"":"zero"}'>${fmt(AGGF.loteT[lote])}</td>
+      <td class='num'>${dateToBR(s.first)}</td>
+      <td class='num'>${dateToBR(s.last)}</td>
+      <td class='l dias-cell'><span class='badge ${D.cls}'>${esc(D.txt)}</span>${D.dist.length>1?`<div class='dias-list'>${D.dist.map(x=>`${esc(x.data.slice(0,5))} <b>${fmt(x.qtde)}</b>`).join(" · ")}</div>`:""}</td>
+      ${MATS.map(m=>{ const g=getMetaFur(lote,m), gc=getMeta(lote,m);
+        return `<td class='l num'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}${g.iso?`<div class='lote-desc' title='Data de corte do ${m} + 1 dia útil'>corte ${dateToBR(isoToDate(gc.iso))} + 1 útil</div>`:""}</td>`; }).join("")}
+      <td class='l'>${
+        temMat.length
+          ? temMat.map(m=>{ const sm=statusForFur(lote,m);
+              return `<div class='st-mat'><span class='mat-tag mat-${m}'>${m}</span><span class='badge ${sm.cls}'>${esc(sm.delta||sm.txt)}</span></div>`; }).join("")
+          : `<span class='badge ${s.cls}'>${esc(s.delta||s.txt)}</span>${temPecas?"":"<div class='st-nota'>sem o relatório por Produto da furação não dá pra separar MDF de MDP</div>"}`
+      }</td>
+    </tr>`;
+  }
+  h+="</tbody>";
+  t.innerHTML=h;
+}
+// clique numa quantidade da matriz da furação: quais peças foram furadas naquele dia/lote
+function pecasDoDiaLoteFur(data, lote){
+  const D=buildPecaDia(AGGF?AGGF.recs:[]).find(x=>x.data===data);
+  if(!D) return [];
+  return ordenaPecas(Object.values(D.pecas).filter(p=>p.lote===lote), p=>p.cortado);
+}
+function abrirDetalheFur(data, lote){
+  const pecas=pecasDoDiaLoteFur(data, lote);
+  const tot=pecas.reduce((s,p)=>s+p.cortado,0);
+  const g=getMetaFur(lote), prazo=g.iso?isoToDate(g.iso):null;
+  MODAL_LOTE=lote;
+  // .fur esconde os botões de ficha de corte — imprimir ficha de corte de dentro da furação só confundiria
+  document.getElementById("modal").classList.add("fur");
+  document.getElementById("modal-tit").textContent=`${lote} · ${data} · furação`;
+  let sub=`${fmt(tot)} pç furadas · ${pecas.length} peça(s) diferente(s)`;
+  if(prazo){
+    const d=diasUteisEntre(brToDate(data), prazo);
+    sub+=` · prevista da furação ${dateToBR(prazo)} (corte + 1 dia útil)`+
+      (d===0?" — furado no dia":d<0?` — ${-d} dia(s) útil(eis) ANTES da prevista`:` — ${d} dia(s) útil(eis) depois da prevista`);
+  } else sub+=" · lote sem prevista (sem data de corte na Programação ou manual)";
+  document.getElementById("modal-sub").textContent=sub;
+  document.getElementById("modal-kpis").innerHTML="";
+  let h=`<table><thead><tr><th class='l'>Peça</th><th>Ordem</th><th>Furado</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
+  if(!pecas.length) h+=`<tr><td class='l' colspan='5' style='padding:16px;color:var(--txt2)'>Sem peça identificada para este dia/lote — carregue o “Rel Planilhamento por Produto” da furação (mesmo período).</td></tr>`;
+  for(const p of pecas){
+    h+=`<tr><td class='l'><span class='mono peca-cod'>${esc(p.cod)}</span> ${esc(p.desc)}</td>
+      <td class='num'>${esc(ordsStr(p.ords))}</td>
+      <td class='num'>${fmt(p.cortado)}</td>
+      <td class='l'>${esc([...p.maqs].join(", "))}</td>
+      <td class='l'>${esc([...p.ops].join(", "))}</td></tr>`;
+  }
+  h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td></td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
+  document.getElementById("modal-corpo").innerHTML=h;
+  document.getElementById("modal").classList.remove("hidden");
+}
+
 /* ---------- Abas ---------- */
 const ABAS=[
   {id:"geral",  nome:"Visão geral"},
@@ -2545,6 +2855,7 @@ const ABAS=[
   {id:"matriz", nome:"Matriz & Funcionário", secs:["sec-matriz","sec-func"]},
   {id:"pecas",  nome:"Peças",                secs:["sec-peca","sec-pecadata"]},
   {id:"pulmao", nome:"Pulmão & Invasão",     secs:["sec-pulmao","sec-invasao"]},
+  {id:"fur",    nome:"Furação",              secs:["sec-furmatriz","sec-furprazo"]},
 ];
 let ABA_ATUAL="geral";
 try{ ABA_ATUAL=localStorage.getItem("rastreioCorte:aba")||"geral"; }catch(e){}
@@ -2552,7 +2863,7 @@ function aplicaAba(){
   const aba=ABAS.find(a=>a.id===ABA_ATUAL)||ABAS[0];
   const mostra=(id,sim)=>{ const el=document.getElementById(id); if(el) el.classList.toggle("tab-hidden",!sim); };
   mostra("kpis", aba.id==="geral"); mostra("sec-graficos", aba.id==="geral");
-  for(const s of ["sec-prazo","sec-matriz","sec-func","sec-peca","sec-pecadata","sec-pulmao","sec-invasao"])
+  for(const s of ["sec-prazo","sec-matriz","sec-func","sec-peca","sec-pecadata","sec-pulmao","sec-invasao","sec-furmatriz","sec-furprazo"])
     mostra(s, !!(aba.secs&&aba.secs.includes(s)));
   document.querySelectorAll(".aba-btn").forEach(b=>b.classList.toggle("on", b.dataset.aba===aba.id));
 }
@@ -2561,6 +2872,7 @@ function setAba(id){
   aplicaAba();
   if(id==="matriz"&&AGG) renderMatriz();   // remede a altura do cabeçalho grudado (era 0 escondida)
   if(id==="geral"&&AGG)  renderGraficos(); // largura real do card só existe com a aba visível
+  if(id==="fur"&&AGGF)   renderFurMatriz(); // idem: altura do cabeçalho grudado da matriz da furação
   window.scrollTo({top:0});
 }
 
@@ -2758,7 +3070,7 @@ function renderAll(period){
   fper.textContent = real ? `Período: ${real} · ${AGG.datas.length} dia(s)` + (declaraOutro?` (o arquivo declara “${period}”)`:"") : "";
   fper.title = declaraOutro ? "O “Período de:” do cabeçalho do relatório não bate com as datas das operações — vale o das operações." : "";
   OP_FILTER="";                       // novo arquivo volta pra "Todos"
-  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca(); renderPecaData();
+  renderKpis(); renderPrazo(); renderOpFilter(); renderMatriz(); renderFunc(); renderPeca(); renderPecaData(); renderFur();
   aplicaAba();
   if(Object.keys(PROG_MAP).length){
     let c=0; for(const l of AGG.lotes){ if(getMeta(l).src==="prog") c++; }
@@ -2793,8 +3105,28 @@ function processaArquivo(nome, buf, salvar){
       showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
       return false;
     }
-    RAW_RECS=recs; LAST_PERIOD=period;
-    AGG=aggregate(recs.filter(r=>!OCULTOS.has(r.lote)));
+    // FURAÇÃO: mesmo relatório, outro setor. A regra é POR ARQUIVO, não por linha: o export
+    // da furação vem com FURADEIRAS e também TORNOS CNC do setor — se a triagem fosse por
+    // máquina, os tornos "sobrariam" e SUBSTITUIRIAM o corte na tela (visto em arquivo real).
+    // Então: tem furadeira e NENHUMA seccionadora → o arquivo INTEIRO é furação (tornos
+    // incluídos, como o painel do corte já conta tudo do arquivo dele) e o corte carregado
+    // não é tocado. Só divide por máquina no caso raro de um export misto (SEC + FUR juntos).
+    const temFur=recs.some(r=>isFurMaq(r.maq)), temCorte=recs.some(r=>isCorteMaq(r.maq));
+    let furRecs=[], corteRecs=recs;
+    if(temFur && !temCorte){ furRecs=recs; corteRecs=[]; }
+    else if(temFur && temCorte){ furRecs=recs.filter(r=>isFurMaq(r.maq)); corteRecs=recs.filter(r=>!isFurMaq(r.maq)); }
+    if(furRecs.length){
+      RAW_RECS_FUR=furRecs; FUR_NOME=nome;
+      AGGF=aggregate(furRecs.filter(r=>!OCULTOS.has(r.lote)));
+    }
+    if(!corteRecs.length){
+      if(salvar) guardaFur(nome,buf);
+      if(AGG){ renderFur(); if(salvar) setAba("fur"); }
+      else showErr(`Guardei a furação (${furRecs.length} operações). Agora solte o relatório do Corte (“Rel Planilhamento por Funcionário” das seccionadoras) — o painel monta tudo, com a aba Furação junto.`);
+      return true;
+    }
+    RAW_RECS=corteRecs; LAST_PERIOD=period;
+    AGG=aggregate(corteRecs.filter(r=>!OCULTOS.has(r.lote)));
     document.getElementById("fname").textContent=nome;
     document.getElementById("drop").classList.add("hidden");
     document.getElementById("painel").classList.remove("hidden");
@@ -2817,6 +3149,9 @@ function restauraSalvos(){
     return idbGet("produto").then(list=>{
       for(const p of (list||[])){ if(p&&p.buf && processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
       renderSalvoInfo();
+    // a furação volta DEPOIS dos por Produto: assim a cobertura de peça já sai certa na tela
+    }).then(()=>idbGet("fur")).then(f=>{
+      if(f&&f.buf && processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
     });
   }).catch(()=>{});
 }
@@ -2835,7 +3170,7 @@ function applyProg(prog, file){
     }
   }
   if(AGG){
-    renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData();
+    renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData(); renderFur();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
     setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.comMdf} datas de MDF + ${prog.comMdp} de MDP (colunas pelo ${prog.src}) · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
   } else {
@@ -2848,7 +3183,7 @@ function limparManuais(){
     const key=localStorage.key(i);
     if(key && key.indexOf(LS_PRAZO)===0) localStorage.removeItem(key);
   }
-  if(AGG){ renderPrazo(); renderKpis(); renderPeca(); renderPecaData(); setProgInfo("Datas manuais limpas.", false); }
+  if(AGG){ renderPrazo(); renderKpis(); renderPeca(); renderPecaData(); renderFur(); setProgInfo("Datas manuais limpas.", false); }
 }
 
 function handleProg(file){
@@ -2885,7 +3220,7 @@ function applyPeca(prod, file){
     // renderMatriz: liga o clique nas quantidades. renderPrazo: o "Status por material" separa
     // MDF de MDP usando as peças — sem redesenhar aqui, ficava o texto "sem o relatório por
     // Produto..." mesmo com as peças carregadas.
-    renderKpis(); renderPrazo(); renderMatriz(); renderPeca(); renderPecaData();
+    renderKpis(); renderPrazo(); renderMatriz(); renderPeca(); renderPecaData(); renderFur();
     const {cob,tot} = diasSemPeca();
     const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
     const per = PROD_PERIOD?` [${PROD_PERIOD}]`:"";
@@ -2899,7 +3234,7 @@ function limparPecas(){
   PECA_MAP={}; PROD_FILES=[]; PROD_PERIOD="";
   PROD_BUFS=[]; idbDel("produto").then(renderSalvoInfo);   // não voltam na próxima abertura
   setProdInfo("Peças carregadas limpas.", false);
-  if(AGG){ renderKpis(); renderPrazo(); renderMatriz(); renderPeca(); renderPecaData(); }
+  if(AGG){ renderKpis(); renderPrazo(); renderMatriz(); renderPeca(); renderPecaData(); renderFur(); }
 }
 function handleProduto(file){
   const rdr=new FileReader();
@@ -3264,6 +3599,14 @@ document.getElementById("tbl-matriz").addEventListener("click",e=>{
 });
 document.getElementById("tbl-func").addEventListener("click",e=>{
   travaLinha(e.target.closest("tr[data-linha]"), "func");
+});
+// furação: botão de carregar (o mesmo caminho do arrastar — o detector separa pela máquina)
+// e o clique numa quantidade da matriz abre as peças furadas do dia
+document.getElementById("btn-fur").addEventListener("click",()=>document.getElementById("file-fur").click());
+document.getElementById("file-fur").addEventListener("change",e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=""; });
+document.getElementById("tbl-fur-matriz").addEventListener("click",e=>{
+  const td=e.target.closest("td.tem-peca");
+  if(td) abrirDetalheFur(td.dataset.d, td.dataset.l);
 });
 document.getElementById("modal-fechar").addEventListener("click",fecharModal);
 document.getElementById("modal-fundo").addEventListener("click",fecharModal);

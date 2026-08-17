@@ -110,6 +110,22 @@ arrasta o arquivo na tela e o painel monta na hora:
   A leitura da medida segue a convenção `C × L × E` (a espessura é o último número), aguenta o
   material colado no número (`417X14X15MDF7`), vírgula decimal (`1740,5X300X15`) e a forma invertida
   `E × C × L` (`15X2750X1850`).
+- **Furação (aba própria)** — o rastreio das **furadeiras**, no mesmo formato do corte e **sem mexer
+  em nada dele**. Você arrasta na tela o **“Rel Planilhamento por Funcionário” da furação** (o mesmo
+  relatório, exportado do setor das furadeiras) e o painel reconhece sozinho: arquivo com máquina
+  `FUR…`/`FURADEIRA` e **nenhuma seccionadora** é furação inteira (os tornos CNC que vêm no mesmo
+  export contam junto, como no corte) — operação de furadeira **nunca entra nos números do corte**.
+  A **data prevista da furação é a data de corte do material + 1 dia útil** (MDF corta 17/08 → fura
+  18/08 · MDP corta 19/08 → fura 20/08): ela é calculada sozinha da Programação (ou da data manual)
+  do corte — não existe planilha nova de datas pra carregar — e sábado/domingo pulam (feriado conta,
+  o painel não tem o calendário da fábrica). A aba traz: **KPIs** (total furado, lotes atrasados vs
+  corte + 1 útil, sem prevista), a **matriz data × lote** com a linha *Prevista MDF/MDP* e a célula
+  do dia-meta marcada (igual à do corte), e o **Prazo de furação por lote** com o status por material
+  na mesma régua do corte (🟢 Adiantado/No dia · 🔴 Atrasado · 🟡 Em andamento, desvios em dias
+  úteis). Carregando **também o “Rel Planilhamento por Produto” da furação** (botão da seção Peças ou
+  arraste — ele soma no mesmo mapa ordem → peça), a quantidade da matriz vira **clicável** e mostra
+  **quais peças foram furadas** naquele dia, e o status separa MDF de MDP. O arquivo da furação
+  também **fica salvo no navegador** e volta sozinho; lote oculto no corte some da furação também.
 - **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
   carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
   novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra
