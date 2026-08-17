@@ -812,6 +812,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         Com o <b>“Rel Planilhamento por Produto” da furação</b> carregado também (botão da seção Peças, ou arraste), a quantidade vira <b>clicável</b> — mostra <b>quais peças foram furadas</b> naquele dia — e o status separa <b>MDF de MDP</b>.</div>
       <div class="prazo-actions">
         <button class="linkbtn" id="btn-fur" style="margin:0">⇩ Carregar relatório da Furação (.xlsx)</button>
+        <button class="linkbtn" id="btn-fur-prog" style="margin:0" title="A mesma Programação do corte — é dela que sai a prevista da furação (corte do material + 1 dia útil)">⇩ Puxar datas da Programação (.xlsx)</button>
+        <button class="linkbtn" id="btn-fur-prod" style="margin:0" title="O “Rel Planilhamento por Produto” da furação — é ele que dá a peça e o material (MDF/MDP) de cada operação">⇩ Carregar relatório por Produto (.xlsx)</button>
         <span id="fur-info" class="prog-info"></span>
         <input type="file" id="file-fur" accept=".xlsx,.xls" class="hidden">
       </div>
@@ -3646,6 +3648,20 @@ document.getElementById("tbl-func").addEventListener("click",e=>{
 // e o clique numa quantidade da matriz abre as peças furadas do dia
 document.getElementById("btn-fur").addEventListener("click",()=>document.getElementById("file-fur").click());
 document.getElementById("file-fur").addEventListener("change",e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=""; });
+// os botões da furação reaproveitam os inputs que já existem nas seções do corte
+// (as seções podem estar ocultas/desativadas — o input escondido funciona do mesmo jeito)
+document.getElementById("btn-fur-prog").addEventListener("click",()=>fileProg.click());
+document.getElementById("btn-fur-prod").addEventListener("click",()=>fileProd.click());
+// Arrastar em QUALQUER lugar da tela, com o painel aberto: o mesmo caminho do drop inicial —
+// o detector diz se o arquivo é Corte, Furação, por Produto ou Programação. Sem isso, depois
+// de carregar o primeiro arquivo não tinha mais onde soltar os outros (a área inicial some).
+["dragenter","dragover"].forEach(ev=>document.addEventListener(ev,e=>{ e.preventDefault(); }));
+document.addEventListener("drop",e=>{
+  e.preventDefault();
+  if(e.target.closest && e.target.closest("#drop")) return;   // a área inicial já trata o dela
+  const f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
 document.getElementById("tbl-fur-matriz").addEventListener("click",e=>{
   const td=e.target.closest("td.tem-peca");
   if(td) abrirDetalheFur(td.dataset.d, td.dataset.l);
