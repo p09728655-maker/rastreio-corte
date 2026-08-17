@@ -390,11 +390,14 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 /* modal em modo furação: os botões de ficha de corte não fazem sentido ali */
 #modal.fur .mf-btn,#modal.fur .mf-lbl{display:none}
 /* sem arquivo de furação carregado, as seções dela não vão pro PDF do painel;
-   no modo "só furação" (sem o Corte) é o contrário: só as seções da furação saem no papel */
+   no modo "só furação" (sem o Corte) é o contrário: só as seções da furação saem no papel.
+   O !important é OBRIGATÓRIO: a regra geral de impressão força .tab-hidden{display:block
+   !important} pra imprimir todas as seções — sem ele, o PDF saía com páginas de seções
+   vazias (gráficos sem barra, Prazo por lote sem linha) e o conteúdo real lá no fim. */
 @media print{
-  section.fur-vazia{display:none}
-  #painel.so-fur section:not(#sec-furmatriz):not(#sec-furprazo){display:none}
-  #painel.so-fur .kpis:not(#fur-kpis){display:none}
+  section.fur-vazia{display:none !important}
+  #painel.so-fur section:not(#sec-furmatriz):not(#sec-furprazo){display:none !important}
+  #painel.so-fur .kpis:not(#fur-kpis){display:none !important}
 }
 
 /* ---- ficha de corte (só existe no papel) ---- */
