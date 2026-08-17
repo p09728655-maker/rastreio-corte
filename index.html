@@ -70,9 +70,12 @@ main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
   font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:8px 16px;border-radius:6px;cursor:pointer}
 .aba-btn:hover{border-color:var(--acc);color:var(--acc)}
 .aba-btn.on{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
-/* modo "só furação" (sem o relatório do Corte): as abas do corte ficam apagadas */
-.aba-btn:disabled{opacity:.35;cursor:not-allowed}
-.aba-btn:disabled:hover{border-color:var(--border);color:var(--txt2)}
+/* modo "só furação" (sem o relatório do Corte): as abas do corte continuam navegáveis,
+   mas abrem neste aviso — com o botão de carregar o Corte ali mesmo */
+.aba-vazia{background:var(--surface);border:.5px dashed var(--border);border-radius:10px;
+  padding:44px 24px;text-align:center;color:var(--txt2);font-size:13px;margin-bottom:26px;line-height:1.6}
+.aba-vazia .big{font-family:var(--font-h);font-size:17px;font-weight:700;color:var(--txt);margin-bottom:6px}
+.aba-vazia .linkbtn{margin-top:14px;padding:9px 18px}
 .tab-hidden{display:none!important}
 
 /* Gráficos da Visão geral */
@@ -395,7 +398,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
    !important} pra imprimir todas as seções — sem ele, o PDF saía com páginas de seções
    vazias (gráficos sem barra, Prazo por lote sem linha) e o conteúdo real lá no fim. */
 @media print{
-  section.fur-vazia{display:none !important}
+  section.fur-vazia,#aba-vazia{display:none !important}
   #painel.so-fur section:not(#sec-furmatriz):not(#sec-furprazo){display:none !important}
   #painel.so-fur .kpis:not(#fur-kpis){display:none !important}
 }
@@ -618,6 +621,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     </div>
 
     <nav id="abas"></nav>
+
+    <div id="aba-vazia" class="aba-vazia tab-hidden">
+      <div class="big">Esta aba é montada a partir do relatório do Corte</div>
+      <div>Você está no modo <b>só furação</b>. Pra ver esta aba, carregue o <b>“Rel Planilhamento por Funcionário” das seccionadoras</b> —
+        solte o arquivo em qualquer lugar da tela ou use o botão abaixo. A furação que você já carregou continua guardada e volta junto.</div>
+      <button class="linkbtn" id="btn-carregar-corte">⇩ Carregar relatório do Corte (.xlsx)</button>
+    </div>
 
     <div class="kpis" id="kpis"></div>
 
@@ -2892,16 +2902,14 @@ try{ ABA_ATUAL=localStorage.getItem("rastreioCorte:aba")||"geral"; }catch(e){}
 function aplicaAba(){
   const aba=ABAS.find(a=>a.id===ABA_ATUAL)||ABAS[0];
   const mostra=(id,sim)=>{ const el=document.getElementById(id); if(el) el.classList.toggle("tab-hidden",!sim); };
-  mostra("kpis", aba.id==="geral"); mostra("sec-graficos", aba.id==="geral");
+  // modo "só furação": as abas do corte continuam navegáveis, mas abrem no aviso
+  // #aba-vazia (com o botão de carregar o Corte) em vez de mostrar seções vazias
+  const soFur=!AGG;
+  mostra("kpis", aba.id==="geral" && !soFur); mostra("sec-graficos", aba.id==="geral" && !soFur);
   for(const s of ["sec-prazo","sec-matriz","sec-func","sec-peca","sec-pecadata","sec-pulmao","sec-invasao","sec-furmatriz","sec-furprazo"])
-    mostra(s, !!(aba.secs&&aba.secs.includes(s)));
-  document.querySelectorAll(".aba-btn").forEach(b=>{
-    b.classList.toggle("on", b.dataset.aba===aba.id);
-    // modo "só furação": sem o relatório do Corte, as outras abas não têm o que mostrar
-    const off=!AGG && b.dataset.aba!=="fur";
-    b.disabled=off;
-    b.title=off?"Carregue o relatório do Corte (“Rel Planilhamento por Funcionário” das seccionadoras) pra ver esta aba":"";
-  });
+    mostra(s, !!(aba.secs&&aba.secs.includes(s)) && !(soFur && s!=="sec-furmatriz" && s!=="sec-furprazo"));
+  mostra("aba-vazia", soFur && aba.id!=="fur");
+  document.querySelectorAll(".aba-btn").forEach(b=>b.classList.toggle("on", b.dataset.aba===aba.id));
 }
 function setAba(id){
   ABA_ATUAL=id; try{ localStorage.setItem("rastreioCorte:aba",id); }catch(e){}
@@ -3652,6 +3660,8 @@ document.getElementById("file-fur").addEventListener("change",e=>{ if(e.target.f
 // (as seções podem estar ocultas/desativadas — o input escondido funciona do mesmo jeito)
 document.getElementById("btn-fur-prog").addEventListener("click",()=>fileProg.click());
 document.getElementById("btn-fur-prod").addEventListener("click",()=>fileProd.click());
+// aviso das abas do corte no modo "só furação": o botão abre o mesmo seletor da tela inicial
+document.getElementById("btn-carregar-corte").addEventListener("click",()=>fileInput.click());
 // Arrastar em QUALQUER lugar da tela, com o painel aberto: o mesmo caminho do drop inicial —
 // o detector diz se o arquivo é Corte, Furação, por Produto ou Programação. Sem isso, depois
 // de carregar o primeiro arquivo não tinha mais onde soltar os outros (a área inicial some).
