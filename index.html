@@ -385,6 +385,11 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 #tbl-fur-matriz td.tem-peca{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;
   text-underline-offset:3px;text-decoration-color:var(--txt3)}
 #tbl-fur-matriz td.tem-peca:hover{color:var(--acc);text-decoration-color:var(--acc)}
+/* cabeçalho do lote na matriz da furação = imprimir a ficha de furação daquele lote */
+#tbl-fur-matriz th.lote-col{cursor:pointer}
+#tbl-fur-matriz th.lote-col:hover{color:var(--acc)}
+#tbl-fur-matriz th.lote-col .th-pr{opacity:0;font-size:10px}
+#tbl-fur-matriz th.lote-col:hover .th-pr{opacity:1}
 #tbl-fur-prazo .st-mat{display:flex;align-items:center;gap:6px;margin-bottom:4px;white-space:nowrap}
 #tbl-fur-prazo .st-nota{font-family:var(--font-d);font-size:9.5px;color:var(--txt3);margin-top:4px;white-space:normal;max-width:220px}
 #tbl-fur-prazo .dias-cell{white-space:normal;min-width:190px;max-width:340px}
@@ -2791,7 +2796,9 @@ function renderFurMatriz(){
   const M=AGGF;
   const temPecas=Object.keys(PECA_MAP).length>0;
   let h="<thead><tr><th class='l'>Data</th>";
-  for(const l of M.lotes) h+=`<th title='${esc(l)}'>${esc(l)}</th>`;
+  // o cabeçalho do lote imprime a ficha de furação da coluna — o mesmo atalho da matriz do corte
+  for(const l of M.lotes)
+    h+=`<th class='lote-col' data-lote='${esc(l)}' title='Clique para imprimir a ficha de furação do lote ${esc(l)} — peças, prevista (corte + 1 dia útil), realizada e o desvio em dias'>${esc(l)} <span class='th-pr'>🖶</span></th>`;
   h+="<th title='Quantos lotes diferentes tiveram furação na data'>Lotes no dia</th><th>Total dia</th></tr>";
   // 2ª linha do cabeçalho: quando cada lote DEVERIA estar furado (corte do material + 1 dia útil)
   h+="<tr class='trprog'><th class='l'>Prevista MDF / MDP</th>";
@@ -2886,6 +2893,134 @@ function abrirDetalheFur(data, lote){
   h+=`<tr class='trtot'><td class='l'>Total do dia neste lote</td><td></td><td>${fmt(tot)}</td><td></td><td></td></tr></tbody></table>`;
   document.getElementById("modal-corpo").innerHTML=h;
   document.getElementById("modal").classList.remove("hidden");
+}
+
+/* ---------- Ficha de furação (o papel que vai pra furadeira) ----------
+   O espelho da ficha de corte, cobrado contra a PREVISTA DA FURAÇÃO (corte do material
+   + 1 dia útil). Sai pelo clique no cabeçalho do lote na matriz da furação. Reusa o mesmo
+   visual (#ficha / fx-*) e o mesmo caminho de impressão da ficha de corte. */
+function pecasDoLoteFur(lote){
+  const pecas={}, ordVista=new Set();
+  for(const r of (AGGF?AGGF.recs:[])){
+    if(r.lote!==lote) continue;
+    const p=PECA_MAP[r.ordem]||null;
+    const cod=p?p.cod:"—";
+    const desc=p?p.desc:"(sem peça — essa ordem não está em nenhum relatório por Produto carregado)";
+    const P=pecas[cod]||(pecas[cod]={cod,desc,cortado:0,planejado:0,datas:new Set(),maqs:new Set(),ops:new Set(),ords:new Set()});
+    P.cortado+=r.qtde; P.ords.add(r.ordem);
+    if(p&&!ordVista.has(r.ordem)){ P.planejado+=(p.qtdeOrdem||0); ordVista.add(r.ordem); }  // planejado 1x por ordem
+    if(r.data)P.datas.add(r.data); if(r.maq)P.maqs.add(r.maq); if(r.func)P.ops.add(r.func);
+  }
+  return ordenaPecas(Object.values(pecas), p=>p.cortado);
+}
+function fichaLinhaFur(p, lote){
+  const mat=materialDe(p.desc);
+  const g=getMetaFur(lote, mat||undefined), pz=isoToDate(g.iso);
+  const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
+  const f=saldoDe(p);
+  const sobra=(p.planejado||0)>0&&p.cortado>p.planejado?p.cortado-p.planejado:0;
+  const dv=(pz&&ult)?diasUteisEntre(ult,pz):null;
+  const dvTxt=dv===null?"":dv===0?"no dia":dv<0?`−${-dv} d`:`+${dv} d`;
+  return `<tr class='${f?"falta":""}'>
+    <td class='l'>${esc(p.cod)}</td><td class='l'>${esc(p.desc)}</td>
+    <td class='l fx-ord'>${(oa=>oa.length<=4?oa.map(esc).join("<br>"):oa.slice(0,4).map(esc).join("<br>")+"<br>+"+(oa.length-4))([...p.ords].sort((a,b)=>a-b))}</td>
+    <td>${g.iso?dateToBR(pz):"—"}</td>
+    <td class='fx-real'>${ult?dateToBR(ult):"—"}${p.datas.size>1?"*":""}<span class='fx-dv ${dv>0?"atr":"adi"}'>${dvTxt}</span></td>
+    <td>${p.planejado?fmt(p.planejado):"—"}</td><td>${fmt(p.cortado)}</td>
+    <td>${f?fmt(f):(sobra?`<span class='fx-sobra'>+${fmt(sobra)}</span>`:"—")}</td>
+    <td class='ok-box'></td></tr>`;
+}
+function fichaDeLoteFur(lote){
+  const pecas=pecasDoLoteFur(lote);
+  if(!pecas.length) return "";
+  const st=statusForFur(lote), D=diasDoLoteFur(lote);
+  const desc=(AGGF.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
+  const ag=new Date();
+  const impresso=String(ag.getDate()).padStart(2,"0")+"/"+String(ag.getMonth()+1).padStart(2,"0")+"/"+String(ag.getFullYear()).slice(-2)
+    +" "+String(ag.getHours()).padStart(2,"0")+":"+String(ag.getMinutes()).padStart(2,"0");
+  const totC=pecas.reduce((s,p)=>s+p.cortado,0);
+  const totP=pecas.reduce((s,p)=>s+(p.planejado||0),0);
+  const totF=pecas.reduce((s,p)=>s+saldoDe(p),0);
+  const nFalta=pecas.filter(p=>saldoDe(p)>0).length;
+  const semPeca=pecas.some(p=>p.cod==="—");
+  const grupos=MATS.map(m=>({mat:m,lista:pecas.filter(p=>materialDe(p.desc)===m)}))
+    .concat([{mat:"",lista:pecas.filter(p=>!materialDe(p.desc))}]).filter(g=>g.lista.length);
+  const cards=MATS.map(m=>{
+    const g=getMetaFur(lote,m), gc=getMeta(lote,m), sm=statusForFur(lote,m);
+    const n=pecas.filter(p=>materialDe(p.desc)===m).length;
+    if(!n&&!g.iso) return "";
+    return `<div class='fx-card'><div class='l'>Prevista furação ${m}</div>
+      <div class='v'>${g.iso?dateToBR(isoToDate(g.iso)):"—"}</div>
+      <div class='l'>${g.iso?`corte ${dateToBR(isoToDate(gc.iso))} + 1 útil · `:""}${n} peça(s)${sm.delta?" · "+esc(sm.delta):""}</div></div>`;
+  }).join("");
+  return `<div class='fx-pg'>
+    <div class='fx-cab'>
+      <img src="patrimar-logo.png" class="fx-logo" alt="Patrimar" onerror="this.style.display='none'">
+      <div><div class='fx-lb'>PPCP — Planejamento e Controle da Produção</div>
+      <div class='fx-tit'>Ficha de furação <span>· ${esc(lote)}</span></div>
+      <div class='fx-sub'>${esc(desc||"—")} · Furação · Patrimar Móveis · Jaci/SP · impressa em ${impresso}</div></div>
+    </div>
+    <div class='fx-box'>
+      ${cards}
+      <div class='fx-card'><div class='l'>Planejado</div><div class='v'>${totP?fmt(totP):"—"}</div></div>
+      <div class='fx-card'><div class='l'>Já furado</div><div class='v'>${fmt(totC)}</div></div>
+      <div class='fx-card ${totF?"fx-alerta":""}'><div class='l'>Falta furar</div><div class='v'>${totF?fmt(totF):"0"}</div>
+        <div class='l'>${pecas.length} peça(s)${nFalta?` · ${nFalta} c/ falta`:""}</div></div>
+    </div>
+    <div class='fx-linha'>
+      Status: <b>${esc(st.txt)}${st.delta?" · "+esc(st.delta):""}</b> (pela última furação) ·
+      Dias de furação: <b>${D.txt}</b>${D.dist.length?` — ${D.dist.map(x=>esc(x.data)+" "+fmt(x.qtde)).join(" · ")}`:""}
+    </div>
+    <div class='fx-como'><b>Como ler:</b>
+      <b>Ordem</b> = nº da ordem de produção no sistema — é por ela que se confere qualquer linha no ERP.
+      <b>Prevista</b> = a data de corte do material na Programação <b>+ 1 dia útil</b> (MDF corta 17/08 → fura 18/08; sábado e domingo pulam).
+      <b>Realizada</b> = data da <b>última</b> furação da peça; <b>*</b> = a peça saiu em mais de um dia.
+      O desvio ao lado compara com a prevista, <b>em dias úteis</b>: <b>−2 d</b> = 2 dias úteis antes · <b>+1 d</b> = 1 dia útil depois · <b>no dia</b> = na data.
+      <b>Falta</b> = planejado − furado. <b>OK</b> = espaço pra marcar na máquina ao conferir.
+    </div>
+    ${grupos.map(gr=>{
+      const g=gr.mat?getMetaFur(lote,gr.mat):{iso:""};
+      const sC=gr.lista.reduce((s,p)=>s+p.cortado,0), sP=gr.lista.reduce((s,p)=>s+(p.planejado||0),0), sF=gr.lista.reduce((s,p)=>s+saldoDe(p),0);
+      return `<table><colgroup>
+        <col style='width:86px'><col><col style='width:72px'><col style='width:68px'><col style='width:112px'>
+        <col style='width:68px'><col style='width:64px'><col style='width:58px'><col style='width:54px'>
+      </colgroup><thead>
+      <tr class='fx-grp'><th class='l' colspan='9'>${esc(lote)} · ${gr.mat?esc(gr.mat):"Sem material na descrição"}${g.iso?` · prevista furação <b>${dateToBR(isoToDate(g.iso))}</b>`:""} · ${gr.lista.length} peça(s)</th></tr>
+      <tr>
+        <th class='l'>Peça (código)</th><th class='l'>Descrição</th><th class='l'>Ordem</th>
+        <th>Prevista</th><th>Realizada</th><th>Planejado</th><th>Furado</th><th>Falta</th><th class='c'>OK</th>
+      </tr></thead><tbody>
+      ${gr.lista.map(p=>fichaLinhaFur(p,lote)).join("")}
+      <tr class='fx-sub'><td class='l' colspan='5'><b>Subtotal ${esc(gr.mat||"—")}</b></td><td><b>${sP?fmt(sP):"—"}</b></td>
+        <td><b>${fmt(sC)}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
+      </tbody></table>`;
+    }).join("")}
+    <div class='fx-linha'><b>Total do lote:</b> planejado ${totP?fmt(totP):"—"} · furado ${fmt(totC)} · falta ${totF?fmt(totF):"0"}</div>
+    <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
+    <div class='fx-nota'>
+      “Prevista” é a data de corte do material na Programação <b>+ 1 dia útil</b> — a régua da furação.
+      “Realizada” é a última furação daquela peça, e ao lado o desvio em dias úteis (− antes da prevista, + depois).
+      Origem: “Rel Planilhamento por Funcionário” da furação cruzado com o “Rel Planilhamento por Produto” pelo nº da ORDEM.
+      ${semPeca?"<b>Atenção: há furação neste lote cujas ordens não estão no relatório por Produto carregado — a linha “sem peça” representa esse volume.</b>":""}
+    </div>
+  </div>`;
+}
+function imprimirFichaFur(lote){
+  if(!Object.keys(PECA_MAP).length){
+    avisoFicha("Pra imprimir a ficha de furação carregue antes o “Rel Planilhamento por Produto” da furação (botão na seção Furação) — é ele que diz quais peças são do lote.");
+    return;
+  }
+  const pg=fichaDeLoteFur(lote);
+  if(!pg){ avisoFicha(`Nenhuma peça furada em ${lote} — nada a imprimir.`); return; }
+  document.getElementById("ficha").innerHTML=pg;
+  document.body.classList.add("modo-ficha");
+  const tituloAntes=document.title;
+  document.title=("Ficha de furação "+lote).replace(/\//g,"-");
+  const limpa=()=>{ document.body.classList.remove("modo-ficha"); document.title=tituloAntes;
+                    window.removeEventListener("afterprint",limpa); };
+  window.addEventListener("afterprint",limpa);
+  window.print();
+  setTimeout(limpa,1500);
 }
 
 /* ---------- Abas ---------- */
@@ -3673,6 +3808,8 @@ document.addEventListener("drop",e=>{
   if(f) handleFile(f);
 });
 document.getElementById("tbl-fur-matriz").addEventListener("click",e=>{
+  const th=e.target.closest("th.lote-col");
+  if(th){ imprimirFichaFur(th.dataset.lote); return; }   // cabeçalho do lote: ficha de furação
   const td=e.target.closest("td.tem-peca");
   if(td) abrirDetalheFur(td.dataset.d, td.dataset.l);
 });
