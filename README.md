@@ -126,6 +126,11 @@ arrasta o arquivo na tela e o painel monta na hora:
   arraste — ele soma no mesmo mapa ordem → peça), a quantidade da matriz vira **clicável** e mostra
   **quais peças foram furadas** naquele dia, e o status separa MDF de MDP. O arquivo da furação
   também **fica salvo no navegador** e volta sozinho; lote oculto no corte some da furação também.
+  **Funciona sem o relatório do Corte**: quem é do setor das furadeiras arrasta só o arquivo da
+  furação e o painel abre direto na aba Furação (as outras abas ficam apagadas até o Corte ser
+  carregado, porque são montadas a partir dele). Nesse modo dá pra arrastar a **Programação** e o
+  **por Produto** da furação normalmente — previstas e peças preenchem na hora — e tudo volta
+  sozinho na próxima abertura. O PDF sai só com as seções da furação.
 - **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
   carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
   novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra

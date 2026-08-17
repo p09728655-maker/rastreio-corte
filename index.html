@@ -70,6 +70,9 @@ main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
   font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:8px 16px;border-radius:6px;cursor:pointer}
 .aba-btn:hover{border-color:var(--acc);color:var(--acc)}
 .aba-btn.on{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
+/* modo "só furação" (sem o relatório do Corte): as abas do corte ficam apagadas */
+.aba-btn:disabled{opacity:.35;cursor:not-allowed}
+.aba-btn:disabled:hover{border-color:var(--border);color:var(--txt2)}
 .tab-hidden{display:none!important}
 
 /* Gráficos da Visão geral */
@@ -386,8 +389,13 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 #tbl-fur-prazo .dias-list b{color:var(--txt);font-weight:600}
 /* modal em modo furação: os botões de ficha de corte não fazem sentido ali */
 #modal.fur .mf-btn,#modal.fur .mf-lbl{display:none}
-/* sem arquivo de furação carregado, as seções dela não vão pro PDF do painel */
-@media print{ section.fur-vazia{display:none} }
+/* sem arquivo de furação carregado, as seções dela não vão pro PDF do painel;
+   no modo "só furação" (sem o Corte) é o contrário: só as seções da furação saem no papel */
+@media print{
+  section.fur-vazia{display:none}
+  #painel.so-fur section:not(#sec-furmatriz):not(#sec-furprazo){display:none}
+  #painel.so-fur .kpis:not(#fur-kpis){display:none}
+}
 
 /* ---- ficha de corte (só existe no papel) ---- */
 #ficha{display:none}
@@ -577,7 +585,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   <div id="drop">
     <div class="icon">📄</div>
     <div class="big">Arraste aqui o relatório do sistema</div>
-    <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> (.xlsx) que você exporta do sistema.
+    <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> (.xlsx) que você exporta do sistema —
+      o do <b>Corte</b> ou o da <b>Furação</b> (o painel reconhece pela máquina; só o da furação também funciona).
       O painel monta a comparação por lote e data automaticamente — nada é enviado pra internet, tudo roda no seu navegador.</div>
     <div class="btn">Selecionar arquivo</div>
     <div class="hint">.xlsx exportado do sistema · fica tudo local · o último arquivo fica salvo neste navegador e volta sozinho</div>
@@ -2709,6 +2718,22 @@ function diasDoLoteFur(lote){
   return {datas,dist,n,parados,cls,txt};
 }
 
+/* Modo "SÓ FURAÇÃO": quem é do setor das furadeiras abre o painel só com o relatório da
+   furação, sem precisar do Corte. O painel abre direto na aba Furação e as outras abas ficam
+   apagadas (elas são todas montadas a partir do relatório do Corte) até ele ser carregado.
+   As previstas continuam vindo da Programação (dá pra arrastar ela na tela nesse modo também). */
+function mostraPainelFur(){
+  if(!AGGF) return;
+  clearErr();
+  document.getElementById("fname").textContent=FUR_NOME;
+  document.getElementById("fper").textContent=`Furação · Período: ${periodoDosDados(AGGF.datas)} · ${AGGF.datas.length} dia(s)`;
+  document.getElementById("drop").classList.add("hidden");
+  document.getElementById("painel").classList.remove("hidden");
+  document.getElementById("painel").classList.add("so-fur");
+  document.getElementById("filebar").style.display="flex";
+  renderFur();
+  setAba("fur");
+}
 function renderFur(){
   const s1=document.getElementById("sec-furmatriz"), s2=document.getElementById("sec-furprazo");
   if(!s1||!s2) return;
@@ -2865,7 +2890,13 @@ function aplicaAba(){
   mostra("kpis", aba.id==="geral"); mostra("sec-graficos", aba.id==="geral");
   for(const s of ["sec-prazo","sec-matriz","sec-func","sec-peca","sec-pecadata","sec-pulmao","sec-invasao","sec-furmatriz","sec-furprazo"])
     mostra(s, !!(aba.secs&&aba.secs.includes(s)));
-  document.querySelectorAll(".aba-btn").forEach(b=>b.classList.toggle("on", b.dataset.aba===aba.id));
+  document.querySelectorAll(".aba-btn").forEach(b=>{
+    b.classList.toggle("on", b.dataset.aba===aba.id);
+    // modo "só furação": sem o relatório do Corte, as outras abas não têm o que mostrar
+    const off=!AGG && b.dataset.aba!=="fur";
+    b.disabled=off;
+    b.title=off?"Carregue o relatório do Corte (“Rel Planilhamento por Funcionário” das seccionadoras) pra ver esta aba":"";
+  });
 }
 function setAba(id){
   ABA_ATUAL=id; try{ localStorage.setItem("rastreioCorte:aba",id); }catch(e){}
@@ -3122,7 +3153,7 @@ function processaArquivo(nome, buf, salvar){
     if(!corteRecs.length){
       if(salvar) guardaFur(nome,buf);
       if(AGG){ renderFur(); if(salvar) setAba("fur"); }
-      else showErr(`Guardei a furação (${furRecs.length} operações). Agora solte o relatório do Corte (“Rel Planilhamento por Funcionário” das seccionadoras) — o painel monta tudo, com a aba Furação junto.`);
+      else mostraPainelFur();   // sem o Corte, o painel abre no modo "só furação"
       return true;
     }
     RAW_RECS=corteRecs; LAST_PERIOD=period;
@@ -3130,6 +3161,7 @@ function processaArquivo(nome, buf, salvar){
     document.getElementById("fname").textContent=nome;
     document.getElementById("drop").classList.add("hidden");
     document.getElementById("painel").classList.remove("hidden");
+    document.getElementById("painel").classList.remove("so-fur");   // o Corte chegou: painel completo
     document.getElementById("filebar").style.display="flex";
     renderAll(period);
     if(salvar) guardaCorte(nome,buf);
@@ -3142,17 +3174,18 @@ function processaArquivo(nome, buf, salvar){
    normal — arrastar o arquivo de novo sempre funciona. */
 function restauraSalvos(){
   idbGet("corte").then(c=>{
-    if(!c||!c.buf) return;
-    if(!processaArquivo(c.nome, c.buf, false)) return;
-    ARQ_SALVO={nome:c.nome, quando:c.quando};
-    renderSalvoInfo();
-    return idbGet("produto").then(list=>{
-      for(const p of (list||[])){ if(p&&p.buf && processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
+    if(c&&c.buf && processaArquivo(c.nome, c.buf, false)){
+      ARQ_SALVO={nome:c.nome, quando:c.quando};
       renderSalvoInfo();
-    // a furação volta DEPOIS dos por Produto: assim a cobertura de peça já sai certa na tela
-    }).then(()=>idbGet("fur")).then(f=>{
-      if(f&&f.buf && processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
-    });
+    }
+  // os por Produto voltam MESMO SEM o Corte salvo — no modo "só furação" são eles que dão a peça
+  }).then(()=>idbGet("produto")).then(list=>{
+    for(const p of (list||[])){ if(p&&p.buf && processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
+    renderSalvoInfo();
+  // a furação volta DEPOIS dos por Produto: assim a cobertura de peça já sai certa na tela.
+  // Sem Corte salvo, é aqui que o painel abre no modo "só furação".
+  }).then(()=>idbGet("fur")).then(f=>{
+    if(f&&f.buf && processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
   }).catch(()=>{});
 }
 
@@ -3173,6 +3206,9 @@ function applyProg(prog, file){
     renderPrazo(); renderKpis(); renderMatriz(); renderPeca(); renderPecaData(); renderFur();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
     setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.comMdf} datas de MDF + ${prog.comMdp} de MDP (colunas pelo ${prog.src}) · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
+  } else if(AGGF){
+    // modo "só furação": as previstas (corte + 1 dia útil) preenchem na hora com as datas novas
+    renderFur(); clearErr();
   } else {
     showErr(`Guardei ${prog.n} datas da Programação. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — os prazos preenchem sozinhos.`);
   }
@@ -3225,6 +3261,9 @@ function applyPeca(prod, file){
     const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
     const per = PROD_PERIOD?` [${PROD_PERIOD}]`:"";
     setProdInfo(`✓ ${quantos}${per} · ${cob}/${tot} operações cortadas com peça identificada.`, false);
+  } else if(AGGF){
+    // modo "só furação": a peça/material entra na matriz e no status da furação na hora
+    renderFur(); clearErr();
   } else {
     showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — as peças aparecem por lote.`);
   }
