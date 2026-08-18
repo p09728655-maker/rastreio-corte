@@ -80,6 +80,10 @@ main{flex:1;padding:20px;max-width:min(1760px,96vw);width:100%;margin:0 auto}
   padding:44px 24px;text-align:center;color:var(--txt2);font-size:13px;margin-bottom:26px;line-height:1.6}
 .aba-vazia .big{font-family:var(--font-h);font-size:17px;font-weight:700;color:var(--txt);margin-bottom:6px}
 .aba-vazia .linkbtn{margin-top:14px;padding:9px 18px}
+/* aviso do PDF incompleto: fica embaixo da barra do arquivo, do setor que está na tela */
+.pdf-aviso{background:rgba(255,152,0,.10);border:.5px solid var(--warn);border-left:3px solid var(--warn);
+  border-radius:7px;padding:10px 14px;margin:-8px 0 18px;color:var(--txt2);font-size:12.5px;line-height:1.6}
+.pdf-aviso b{color:var(--txt)}
 .tab-hidden{display:none!important}
 
 /* Gráficos da Visão geral */
@@ -368,7 +372,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
 /* ---- Furação ----
    As tabelas da furação usam as MESMAS regras do corte: os seletores acima casam pelo FIM do
    id ([id$="tbl-matriz"] pega "tbl-matriz" e "fur-tbl-matriz"), então o que se arruma no corte
-   vale na furação sem cópia de CSS. Aqui embaixo fica só o que é da furação mesmo. ---- */
+   vale na furação sem cópia de CSS.
+   ATENÇÃO ao criar id novo: qualquer id terminado num desses sufixos (tbl-matriz, tbl-func,
+   tbl-prazo, tbl-peca, tbl-pecadata, tbl-invasao, peca-search, pd-search, pd-mode, op-filter,
+   mat-filter, peca-warn, ocultos-info, pulmao-grid, inv-lote, peca-info, pd-info, op-info)
+   herda esse estilo em silêncio. O prefixo do setor vai na FRENTE do nome, nunca no fim.
+   Aqui embaixo fica só o que é da furação mesmo. ---- */
 /* seletor de setor (Corte | Furação) no topo, acima das abas */
 #setores{display:flex;gap:6px;margin:0 0 2px;padding:6px 0 0}
 .set-btn{background:none;border:.5px solid var(--border);color:var(--txt2);font-family:var(--font-d);
@@ -408,6 +417,10 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   body:not(.setor-fur) #painel > [id^="fur-"]{display:none !important}
   body.setor-fur #painel > section:not([id^="fur-"]),
   body.setor-fur #painel > .kpis:not([id^="fur-"]){display:none !important}
+  /* setor sem arquivo carregado: sai o aviso, e não sete páginas de seção vazia */
+  body.setor-vazio #painel > section,body.setor-vazio #painel > .kpis{display:none !important}
+  body.setor-vazio #aba-vazia,body.setor-vazio #fur-vazia-aviso{display:block !important}
+  body.setor-vazio #painel.so-fur #aba-vazia{display:block !important}
   .gr-card{background:#fff !important;border:1px solid #bbb;break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
   .gr-tit,.gr-leg{color:#333 !important}
   /* o gráfico escala pra caber na folha (nada de estourar a largura) e os gráficos seguem
@@ -586,6 +599,8 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     <input type="file" id="file" accept=".xlsx,.xls,.pdf" class="hidden">
   </div>
   <div id="err" class="err hidden"></div>
+  <!-- aviso do que faltou no PDF: fica na tela enquanto o arquivo estiver carregado -->
+  <div id="pdf-aviso" class="pdf-aviso hidden"></div>
 
   <!-- Loaded state -->
   <div id="painel" class="hidden">
@@ -1034,13 +1049,21 @@ try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG
   }
 })();
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
-/* "ordem|data" -> QTDE PROD. e ordem -> lote: os dois remendos para PDF incompleto.
-   O relatório por Funcionário exportado em PDF nem sempre traz a coluna QTDE e a linha "Lote"
-   (o do corte traz; o da furação, na fase 55, não). Quando faltar, o painel completa com o que
-   já sabe: a quantidade vem do "por Produto" (que traz ORDEM + DATA + QTDE PROD.) e o lote vem
-   de um relatório do mesmo setor já carregado. O que não der pra completar é DITO na tela, não
-   inventado. */
-const PROD_QTDE = {};
+/* Os dois remendos para PDF incompleto. O relatório por Funcionário exportado em PDF nem sempre
+   traz a coluna QTDE e a linha "Lote" (o do corte traz; o da furação, na fase 55, não). Quando
+   faltar, o painel completa com o que já sabe — e DIZ na tela o que completou.
+
+   PROD_OPS: "setor|ordem|data" -> LISTA das operações daquela ordem naquele dia, como vieram no
+   "por Produto" ({maq, func, qtde}). É lista, e não soma, porque a mesma ordem passa por duas
+   máquinas no mesmo dia: dar o total do dia para CADA operação inflava a produção (medido: 23%
+   a mais na furação). Cada operação do relatório por Funcionário CONSOME uma entrada da lista,
+   casando por máquina/operador quando dá.
+   O setor entra na chave porque a mesma ordem pode aparecer no "por Produto" do corte e no da
+   furação com quantidades diferentes — e aí a do corte não pode virar a da furação.
+
+   LOTE_ORDEM: ordem -> lote, de qualquer relatório por Funcionário já lido (ele é quem traz o
+   lote). É por ele que um PDF sem a linha "Lote" recupera o lote pelo nº da ORDEM. */
+const PROD_OPS = {};
 const LOTE_ORDEM = {};
 // nome do "lote" das operações que vieram sem lote — aparece assim na tela, pra ninguém
 // confundir com lote de verdade
@@ -1412,6 +1435,7 @@ function parseProduto(wb){
 // mesma ideia do parseFuncRows: o PDF do "por Produto" cai aqui pelas mesmas linhas
 function parseProdutoRows(rows){
   const map={}, qprod={}; let n=0, cur=null, period="", hibridas=0; const datas=new Set();
+  let temFur=false, temCorte=false;      // de que setor é este arquivo (mesma regra do por Funcionário)
   for(const row of rows){
     const c = row||[];
     for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
@@ -1433,16 +1457,18 @@ function parseProdutoRows(rows){
       }
       const dt=(typeof c[3]==="string" && /\d\d?\/\d\d?\/\d\d/.test(c[3])) ? c[3].trim() : "";
       if(dt) datas.add(dt);
-      // ORDEM+DATA → QTDE PROD.: é daqui que sai a quantidade quando o relatório por
-      // Funcionário vem SEM a coluna QTDE (o PDF de algumas fases não traz essa coluna).
-      // Soma DENTRO do arquivo (a mesma ordem volta em mais de uma linha); entre arquivos,
-      // quem junta é o applyPeca — somar lá dobraria a quantidade de períodos sobrepostos.
-      const qp=Math.trunc(parseBR(c[2]));
-      if(dt && qp>0) qprod[c[0]+"|"+dt]=(qprod[c[0]+"|"+dt]||0)+qp;
+      const maqCod=String(c[4]||"").trim(), maqNome=String(c[5]||"").trim();
+      if(isFurMaq(maqNome)||isFurMaq(maqCod))     temFur=true;
+      if(isCorteMaq(maqNome)||isCorteMaq(maqCod)) temCorte=true;
+      // Guarda a operação inteira (máquina, operador e QTDE PROD.), não a soma do dia: é assim
+      // que o remendo de quantidade casa uma operação do "por Funcionário" com UMA linha daqui.
+      if(dt) (qprod[c[0]+"|"+dt]=qprod[c[0]+"|"+dt]||[]).push({maq:maqNome||maqCod, func:String(c[7]||c[6]||"").trim(), qtde:Math.trunc(parseBR(c[2]))});
       continue;
     }
   }
-  return {map,n,period,hibridas,qprod,datas:[...datas].sort((a,b)=>brToDate(a)-brToDate(b))};
+  // mesma regra do relatório por Funcionário: furadeira e NENHUMA seccionadora = arquivo da furação
+  const setor=(temFur&&!temCorte)?"fur":"corte";
+  return {map,n,period,hibridas,qprod,setor,datas:[...datas].sort((a,b)=>brToDate(a)-brToDate(b))};
 }
 
 /* ---------- aggregate ---------- */
@@ -1591,7 +1617,8 @@ const SC=novoSetor({
   agg:()=>AGG,
   meta:(lote,mat)=>getMeta(lote,mat),
   origem:"“Rel Planilhamento por Funcionário”",
-  v:{ac:"cortado", Ac:"Cortado", aca:"cortada", acs:"cortadas", inf:"cortar", op:"corte", Op:"Corte",
+  v:{ac:"cortado", Ac:"Cortado", aca:"cortada", acs:"cortadas", acp:"cortados", inf:"cortar",
+     op:"corte", Op:"Corte", verbo:"cortou", prevLbl:"Programada", prevCol:"Data programada",
      pri:"1º corte", ult:"Último corte", dias:"Dias de corte", ficha:"Ficha de corte",
      prev:"a data de corte do material na Programação (o MDF corta antes — vai pra pintura)"},
 });
@@ -1602,7 +1629,8 @@ const SF=novoSetor({
   origem:"“Rel Planilhamento por Funcionário” da furação",
   // embaixo da prevista da furação vai de onde ela saiu: a data de corte do material + 1 dia útil
   prevSub(lote, mat){ const g=getMeta(lote, mat); return g.iso? `corte ${dateToBR(isoToDate(g.iso))} + 1 útil` : ""; },
-  v:{ac:"furado", Ac:"Furado", aca:"furada", acs:"furadas", inf:"furar", op:"furação", Op:"Furação",
+  v:{ac:"furado", Ac:"Furado", aca:"furada", acs:"furadas", acp:"furados", inf:"furar",
+     op:"furação", Op:"Furação", verbo:"furou", prevLbl:"Prevista", prevCol:"Data prevista",
      pri:"1ª furação", ult:"Última furação", dias:"Dias de furação", ficha:"Ficha de furação",
      prev:"a data de corte do material na Programação <b>+ 1 dia útil</b> (MDF corta 17/08 → fura 18/08; sábado e domingo pulam)"},
 });
@@ -2160,6 +2188,9 @@ function renderOpFilter(S){
   S=S||SC;
   const sel=S.el("op-filter"); if(!sel) return;
   const A=S.agg();
+  // operador que não existe mais no arquivo não pode continuar filtrando escondido: o seletor
+  // mostraria "Todos" com a matriz zerada
+  if(S.opFilter && !((A&&A.ops)||[]).some(o=>o.cod===S.opFilter)) S.opFilter="";
   let h="<option value=''>Todos</option>";
   for(const o of ((A&&A.ops)||[])) h+=`<option value='${esc(o.cod)}'>${esc(o.cod)}</option>`;
   sel.innerHTML=h; sel.value=S.opFilter;
@@ -2416,7 +2447,7 @@ function fichaDeLote(lote, filtro, S){
         <td><b>${fmt(sC)}</b></td><td class='fx-m2'><b>${sM.m2?fmtM2(sM.m2):"—"}</b></td><td><b>${sF?fmt(sF):"—"}</b></td><td class='ok-box'></td></tr>
       </tbody></table>`;
     }).join("")}
-    <div class='fx-linha'><b>Total ${filtro?`desta folha (${esc(rotuloMat(filtro))})`:"do lote"}:</b> planejado ${totP?fmt(totP):"—"} · ${esc(S.v.ac)} ${fmt(totC)} · falta ${totF?fmt(totF):"0"}${M2F.m2?` · <b>${fmtM2(M2F.m2)} m²</b>${M2F.sem?` (de ${fmt(M2F.com)} de ${fmt(M2F.tot)} pç — as outras não trazem a medida na descrição)`:""}`:""}</div>
+    <div class='fx-linha'><b>Total ${filtro?`desta folha (${esc(rotuloMat(filtro))})`:"do lote"}:</b> planejado ${totP?fmt(totP):"—"} · ${esc(S.v.ac)} ${fmt(totC)} · falta ${totF?fmt(totF):"0"}${M2F.m2?` · <b>${fmtM2(M2F.m2)} m²</b> ${esc(S.v.acp)}${M2F.sem?` (de ${fmt(M2F.com)} de ${fmt(M2F.tot)} pç — as outras não trazem a medida na descrição)`:""}`:""}</div>
     <div class='fx-rod'><div>Operador</div><div>Turno</div><div>Data / Assinatura</div></div>
     <div class='fx-nota'>
       ${filtro?`Esta folha traz <b>só as peças de ${esc(rotuloMat(filtro))}</b> deste lote — planejado, ${esc(S.v.ac)}, falta e % são desta folha, não do lote inteiro.
@@ -2640,7 +2671,7 @@ function renderPeca(S){
   const q=((S.el("peca-search")||{}).value||"").trim().toLowerCase();
   const byLote=buildPecaLote(S);
   const lotes=Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b));
-  let h=`<thead><tr><th class='l'>Peça</th><th>${esc(S.v.Ac)}</th><th title='Área das peças, calculada da medida (C × L) que vem na descrição — não é consumo de chapa'>m²</th><th>Planejado</th><th>%</th><th>Prevista</th><th>Realizada</th><th class='l'>Status</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th class='l'>Peça</th><th>${esc(S.v.Ac)}</th><th title='Área das peças, calculada da medida (C × L) que vem na descrição — não é consumo de chapa'>m²</th><th>Planejado</th><th>%</th><th>${esc(S.v.prevLbl)}</th><th>Realizada</th><th class='l'>Status</th><th class='l'>Máquina</th><th class='l'>Operador</th></tr></thead><tbody>`;
   let anyShown=false, nPecas=0, totM2=0, m2Com=0, m2Sem=0; const mostrados=[];
   for(const lote of lotes){
     let pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0);
@@ -2800,7 +2831,7 @@ function renderPdDia(t, info, q, match, dia, S){
     }
   }
   h+="</tbody>";
-  if(!nDias) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:""} encontrada.</td></tr></tbody>`;
+  if(!nDias) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" "+S.v.aca} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
   const pctM2 = (m2Com+m2Sem) ? Math.round(m2Com/(m2Com+m2Sem)*100) : 0;
   if(info) info.textContent = nDias
@@ -2854,7 +2885,7 @@ function renderPdMatriz(t, info, q, match, dia, S){
   h+="<tr class='trtot'><td class='l'>Total do dia</td>";
   for(const d of datas) h+=`<td>${fmt(colTot[d]||0)}</td>`;
   h+=`<td>${fmt(grand)}</td></tr></tbody>`;
-  if(!chaves.length) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:""} encontrada.</td></tr></tbody>`;
+  if(!chaves.length) h=`<tbody><tr><td class='l' style='color:var(--txt2);padding:16px'>Nenhuma peça${q?` para “${esc(q)}”`:" "+S.v.aca} encontrada.</td></tr></tbody>`;
   t.innerHTML=h;
   if(info) info.textContent=chaves.length?`${chaves.length} lote(s) × ${datas.length} dia(s) · ${fmt(nPecas)} peça(s) · ${fmt(grand)} pç · clique num lote para abrir as peças`:"";
   return chaves;
@@ -3010,6 +3041,8 @@ function aplicaAba(){
   for(const S of SETORES)
     for(const s of SECS_TODAS)
       mostra(S.pfx+s, S===SETOR && !vazio && !!(aba.secs&&aba.secs.includes(s)));
+  // o papel segue a tela: setor sem arquivo não imprime as seções vazias, imprime o aviso
+  document.body.classList.toggle("setor-vazio", vazio);
   mostra("aba-vazia", vazio && SETOR.id==="corte");
   mostra("fur-vazia-aviso", vazio && SETOR.id==="fur");
   mostra("fur-barra", SETOR.id==="fur");
@@ -3028,9 +3061,16 @@ function setAba(id){
   if(id==="geral"&&SETOR.agg())  renderGraficos(SETOR);
   window.scrollTo({top:0});
 }
-// barra do topo: mostra o arquivo e o período DO SETOR que está na tela
+// barra do topo: mostra o arquivo, o período e o aviso de PDF incompleto DO SETOR na tela
 function renderFilebar(){
   const S=SETOR, A=S.agg();
+  const av=document.getElementById("pdf-aviso");
+  if(av){
+    // o aviso mora aqui (e não na caixa de erro) porque ele vale enquanto o arquivo estiver
+    // carregado — na caixa de erro ele sumia no primeiro clique seguinte
+    av.innerHTML=S.avisoPdf?"⚠ "+S.avisoPdf:"";
+    av.classList.toggle("hidden", !S.avisoPdf);
+  }
   const fn=document.getElementById("fname"), fp=document.getElementById("fper");
   if(fn) fn.textContent=(S.id==="fur"?FUR_NOME:CORTE_NOME)||(A?"(arquivo carregado)":"nenhum arquivo do setor");
   if(!fp) return;
@@ -3274,12 +3314,19 @@ function showErr(msg){ const e=document.getElementById("err"); e.textContent="�
 function showErrHtml(html){ const e=document.getElementById("err"); e.innerHTML="⚠ "+html; e.classList.remove("hidden"); }
 function clearErr(){ document.getElementById("err").classList.add("hidden"); }
 
+/* Um arquivo de cada vez. O PDF leva segundos pra ler, e soltar dois arquivos seguidos fazia
+   os dois caminharem juntos: o segundo terminava antes do primeiro e a tela ficava com o
+   número errado (ou zerado). A fila serializa sem travar a interface. */
+let FILA_ARQ=Promise.resolve();
 function handleFile(file){
   clearErr();
-  const rdr=new FileReader();
-  rdr.onload=ev=>{ processaArquivo(file.name, ev.target.result, true); };
-  rdr.onerror=()=>showErr("Não consegui abrir o arquivo.");
-  rdr.readAsArrayBuffer(file);
+  FILA_ARQ=FILA_ARQ.then(()=>new Promise(pronto=>{
+    const rdr=new FileReader();
+    rdr.onload=ev=>{ Promise.resolve(processaArquivo(file.name, ev.target.result, true)).then(pronto, pronto); };
+    rdr.onerror=()=>{ showErr("Não consegui abrir o arquivo."); pronto(); };
+    rdr.readAsArrayBuffer(file);
+  }));
+  return FILA_ARQ;
 }
 // PDF ou planilha? Olha os bytes, não a extensão: arquivo renomeado é comum aqui.
 function ehPdf(buf){
@@ -3322,6 +3369,9 @@ function aplicaRecs(nome, buf, period, recs, salvar){
   if(furRecs.length){
     RAW_RECS_FUR=furRecs; FUR_NOME=nome;
     AGGF=aggregate(furRecs.filter(r=>!OCULTOS.has(r.lote)));
+    // arquivo novo, filtros zerados: o código do operador do arquivo anterior deixava a matriz
+    // zerada com o seletor dizendo "Todos"
+    SF.opFilter=""; SF.matFilter=""; SF.linhaFixa={matriz:"",func:""}; SF.abertos.clear();
   }
   if(!corteRecs.length){
     if(salvar) guardaFur(nome,buf);
@@ -3331,6 +3381,7 @@ function aplicaRecs(nome, buf, period, recs, salvar){
   }
   RAW_RECS=corteRecs; LAST_PERIOD=period; CORTE_NOME=nome;
   AGG=aggregate(corteRecs.filter(r=>!OCULTOS.has(r.lote)));
+  recompletaPdf();   // este arquivo pode ter o lote das ordens de um PDF já carregado
   document.getElementById("drop").classList.add("hidden");
   document.getElementById("painel").classList.remove("hidden");
   document.getElementById("painel").classList.remove("so-fur");   // o Corte chegou: painel completo
@@ -3861,17 +3912,37 @@ function pdfFechaOperacoesSemLote(rows){
   return out;
 }
 
-/* Completa as operações lidas de um PDF incompleto. Devolve o que deu e o que faltou, pra
-   mensagem da tela dizer a verdade em vez de mostrar zero como se fosse produção zero. */
-function completaRecsDoPdf(recs, temQtde, temLote){
+/* Completa as operações lidas de um PDF incompleto e devolve o que deu e o que faltou — a
+   mensagem da tela precisa dizer a verdade em vez de mostrar zero como se fosse produção zero.
+
+   A quantidade é casada OPERAÇÃO A OPERAÇÃO: cada operação do relatório por Funcionário consome
+   UMA linha do "por Produto" daquela ordem naquele dia, de preferência a da mesma máquina e do
+   mesmo operador. Repetir o total do dia em cada operação inflava a produção (a mesma ordem
+   passa por duas furadeiras no mesmo dia). Nada é consumido duas vezes. */
+function completaRecsDoPdf(recs, temQtde, temLote, S){
+  S=S||SC;
   let semQtde=0, zeroQtde=0, semLote=0, comQtde=0, comLote=0;
+  const usados={};                 // chave -> quantas linhas daquela ordem/dia já foram gastas
+  const pegaOperacao=r=>{
+    const lista=PROD_OPS[S.id+"|"+r.ordem+"|"+r.data];
+    if(!lista||!lista.length) return null;
+    const gastos=usados[r.ordem+"|"+r.data]||(usados[r.ordem+"|"+r.data]=[]);
+    const livre=i=>gastos.indexOf(i)<0;
+    const mesmaMaqOp=i=>lista[i].maq===r.maq && lista[i].func===r.func;
+    let alvo=-1;
+    for(let i=0;i<lista.length;i++) if(livre(i)&&mesmaMaqOp(i)){ alvo=i; break; }   // 1ª escolha: bate máquina+operador
+    if(alvo<0) for(let i=0;i<lista.length;i++) if(livre(i)){ alvo=i; break; }       // 2ª: qualquer uma ainda não usada
+    if(alvo<0) return null;                                                         // acabaram: não repete nenhuma
+    gastos.push(alvo);
+    return lista[alvo];
+  };
   for(const r of recs){
     if(!temQtde){
-      const q=PROD_QTDE[r.ordem+"|"+r.data];
-      if(q>0){ r.qtde=q; comQtde++; }
-      // a ordem está no "por Produto" e não tem produção naquele dia: é zero MESMO
-      // (operação apontada sem peça pronta), não é dado faltando
-      else if(PECA_MAP[r.ordem]){ r.qtde=0; zeroQtde++; }
+      const op=pegaOperacao(r);
+      if(op && op.qtde>0){ r.qtde=op.qtde; comQtde++; }
+      // a operação existe no "por Produto" e saiu com zero: é produção zero MESMO
+      // (apontamento sem peça pronta), não é dado faltando
+      else if(op || PECA_MAP[r.ordem]){ r.qtde=0; zeroQtde++; }
       else { r.qtde=0; semQtde++; }         // ordem que nenhum "por Produto" carregado conhece
     }
     if(!temLote){
@@ -3881,6 +3952,43 @@ function completaRecsDoPdf(recs, temQtde, temLote){
     }
   }
   return {semQtde, zeroQtde, semLote, comQtde, comLote};
+}
+
+/* O remendo acontece no instante da carga, mas o arquivo que falta costuma chegar DEPOIS (o
+   "por Produto", ou o relatório do corte que traz o lote das ordens). Então o setor guarda o
+   que leu do PDF e refaz a conta toda vez que chega material novo — senão a furação ficava
+   zerada na tela mesmo com o "por Produto" já carregado. */
+function recompletaPdf(){
+  let mudou=false;
+  for(const S of SETORES){
+    const p=S.pdf;
+    if(!p || (p.temQtde && p.temLote)) continue;
+    const brutos = S.id==="fur" ? RAW_RECS_FUR : RAW_RECS;
+    if(!brutos.length) continue;
+    const C=completaRecsDoPdf(brutos, p.temQtde, p.temLote, S);
+    S.avisoPdf=avisoDoPdf(p, C);
+    if(S.id==="fur") AGGF=aggregate(brutos.filter(r=>!OCULTOS.has(r.lote)));
+    else             AGG =aggregate(brutos.filter(r=>!OCULTOS.has(r.lote)));
+    mudou=true;
+  }
+  return mudou;
+}
+
+/* O aviso do que o PDF não trouxe. Fica guardado no setor (S.avisoPdf) e aparece embaixo da
+   barra do arquivo enquanto valer — na caixa de erro ele sumia no primeiro clique seguinte. */
+function avisoDoPdf(p, C){
+  const partes=[];
+  if(!p.temQtde) partes.push(C.comQtde
+    ? `a coluna <b>QTDE</b> não vem neste PDF — a quantidade veio do relatório por Produto: <b>${fmt(C.comQtde)}</b> operação(ões) com peça pronta`
+      +(C.zeroQtde?`, <b>${fmt(C.zeroQtde)}</b> apontadas com produção <b>zero</b>`:"")
+      +(C.semQtde?` e <b>${fmt(C.semQtde)}</b> sem correspondência (falta carregar o “por Produto” desse período)`:"")
+    : "a coluna <b>QTDE</b> não vem neste PDF e o relatório por Produto do período não está carregado — <b>as quantidades estão zeradas</b>");
+  if(!p.temLote) partes.push(C.comLote
+    ? `a linha <b>Lote</b> não vem neste PDF: o lote foi recuperado pelo nº da ORDEM em <b>${fmt(C.comLote)}</b> operação(ões)`
+      +(C.semLote?` — <b>${fmt(C.semLote)}</b> ficaram em <b>${esc(LOTE_DESCONHECIDO)}</b>`:"")
+    : `a linha <b>Lote</b> não vem neste PDF, então tudo caiu em <b>${esc(LOTE_DESCONHECIDO)}</b> — dá pra ver dia, operador, peça e m², mas <b>não dá pra medir prazo, pulmão nem invasão</b>, que são por lote. `
+      +`Pra ter o lote: exporte o mesmo relatório em <b>.xlsx</b> (a planilha traz a linha do lote) ou peça o PDF com essa linha ligada — o do corte já sai assim`);
+  return partes.length ? "PDF lido, com ressalvas: "+partes.join(" · ")+"." : "";
 }
 
 async function processaPdfArquivo(nome, buf, salvar){
@@ -3914,22 +4022,17 @@ async function processaPdfArquivo(nome, buf, salvar){
       showErr("Li o PDF mas não achei nenhuma operação nele. Confira se o relatório saiu com as linhas de operação (ORDEM/DATA/MÁQUINA).");
       return false;
     }
-    const C=completaRecsDoPdf(recs, R.temQtde, R.temLote);
+    // De que setor é este arquivo (mesma regra do .xlsx: furadeira e nenhuma seccionadora),
+    // pra completar a quantidade com o "por Produto" DELE e guardar o pendente no setor certo
+    const temF=recs.some(r=>isFurMaq(r.maq)), temC=recs.some(r=>isCorteMaq(r.maq));
+    const S=(temF&&!temC)?SF:SC;
+    const C=completaRecsDoPdf(recs, R.temQtde, R.temLote, S);
+    // o que faltou no PDF fica guardado no setor: quando o "por Produto" (ou o relatório que
+    // traz o lote) chegar depois, o recompletaPdf refaz a conta em cima destes mesmos registros
+    S.pdf={temQtde:R.temQtde, temLote:R.temLote, nome};
+    S.avisoPdf=avisoDoPdf(S.pdf, C);
     const ok=aplicaRecs(nome, buf, period||R.periodo.texto, recs, salvar);
-    // O que foi completado (e o que não deu) tem que aparecer: número que veio de remendo não
-    // pode passar por número lido do arquivo, e lote que o PDF não traz não pode virar silêncio.
-    const avisos=[];
-    if(!R.temQtde) avisos.push(C.comQtde
-      ? `a coluna <b>QTDE</b> não vem neste PDF — peguei a quantidade no relatório por Produto: <b>${fmt(C.comQtde)}</b> operação(ões) com peça pronta`
-        +(C.zeroQtde?`, <b>${fmt(C.zeroQtde)}</b> apontadas com produção <b>zero</b>`:"")
-        +(C.semQtde?` e <b>${fmt(C.semQtde)}</b> sem correspondência (falta carregar o “por Produto” desse período)`:"")
-      : "a coluna <b>QTDE</b> não vem neste PDF e o relatório por Produto do período não está carregado — <b>as quantidades ficaram zeradas</b>");
-    if(!R.temLote) avisos.push(C.comLote
-      ? `a linha <b>Lote</b> não vem neste PDF: completei pelo nº da ORDEM em <b>${fmt(C.comLote)}</b> operação(ões)`
-        +(C.semLote?` — <b>${fmt(C.semLote)}</b> ficaram em <b>${esc(LOTE_DESCONHECIDO)}</b>`:"")
-      : `a linha <b>Lote</b> não vem neste PDF, então tudo caiu em <b>${esc(LOTE_DESCONHECIDO)}</b> — dá pra ver dia, operador, peça e m², mas <b>não dá pra medir prazo, pulmão nem invasão</b>, que são por lote. `
-        +`Pra ter o lote: exporte o mesmo relatório em <b>.xlsx</b> (o export em planilha traz a linha do lote) ou peça o PDF com essa linha ligada — o do corte já sai assim`);
-    if(avisos.length) showErrHtml("PDF lido, com ressalvas: "+avisos.join(" · ")+"."); else clearErr();
+    renderFilebar();
     return ok;
   }catch(err){
     showErr("Erro ao ler o PDF: "+err.message+". Se ele estiver protegido por senha ou for digitalizado, use o .xlsx.");
@@ -3956,6 +4059,10 @@ async function restauraSalvos(){
     const f=await idbGet("fur");
     if(f&&f.buf && await processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
   }catch(e){}
+  // o setor guardado no navegador só vale de verdade depois do setSetor: é ele que marca o
+  // body (de onde a impressão sai) e escreve o título do papel. Sem esta linha, um F5 com a
+  // Furação na tela imprimia o Corte.
+  if(SC.temDados()||SF.temDados()) setSetor((SETOR.temDados()?SETOR:(SC.temDados()?SC:SF)).id);
 }
 
 // aplica as datas da Programação (persiste e re-renderiza).
@@ -4011,10 +4118,14 @@ function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); i
 // e cobrir toda a janela do relatório de Corte.
 function applyPeca(prod, file){
   let novos=0;
-  // ORDEM+DATA → QTDE PROD. (só serve de remendo pra PDF sem a coluna QTDE): entre arquivos
-  // vale o MAIOR, nunca a soma — dois relatórios do mesmo período (ou de fases diferentes com
-  // a mesma ordem) dobrariam a quantidade se somassem.
-  for(const k in (prod.qprod||{})) PROD_QTDE[k]=Math.max(PROD_QTDE[k]||0, prod.qprod[k]);
+  // As operações do "por Produto" (remendo de quantidade pra PDF sem a coluna QTDE): entre
+  // arquivos vale a leitura mais COMPLETA daquela ordem/dia, nunca a soma das duas — dois
+  // relatórios de períodos sobrepostos dobrariam a quantidade se somassem.
+  for(const k in (prod.qprod||{})){
+    const chave=(prod.setor||"corte")+"|"+k, nova=prod.qprod[k], velha=PROD_OPS[chave];
+    const soma=l=>l.reduce((s,x)=>s+x.qtde,0);
+    if(!velha || nova.length>velha.length || (nova.length===velha.length && soma(nova)>soma(velha))) PROD_OPS[chave]=nova;
+  }
   for(const ordem in prod.map){
     const nv=prod.map[ordem], ex=PECA_MAP[ordem];
     if(!ex) novos++;
@@ -4025,17 +4136,20 @@ function applyPeca(prod, file){
   }
   PROD_PERIOD = periodoDosDados(prod.datas) || prod.period || "";
   PROD_FILES.push({nome:file?file.name:"(arquivo)", period:PROD_PERIOD, n:prod.n, novos});
+  recompletaPdf();   // PDF sem QTDE/lote carregado antes: agora dá pra completar
   if(AGG){
     // redesenha tudo: a matriz liga o clique nas quantidades, o "Status por material" passa a
     // separar MDF de MDP e a furação herda as peças pelo mesmo mapa de ORDEM.
     redesenhaTudo();
-    const {cob,tot} = diasSemPeca();
+    const {cob,tot} = diasSemPeca(prod.setor==="fur"?SF:SC);
     const quantos = PROD_FILES.length>1 ? `${PROD_FILES.length} relatórios por Produto (+${novos} ordens novas)` : `Produto${file?" ("+file.name+")":""}: ${prod.n} ordens`;
     const per = PROD_PERIOD?` [${PROD_PERIOD}]`:"";
     setProdInfo(`✓ ${quantos}${per} · ${cob}/${tot} operações cortadas com peça identificada.`, false);
   } else if(AGGF){
     // modo "só furação": a peça/material entra na matriz e no status da furação na hora
     redesenhaTudo(); clearErr();
+    const {cob,tot} = diasSemPeca(SF);
+    setProdInfo(`✓ Produto${file?" ("+file.name+")":""}: ${prod.n} ordens · ${cob}/${tot} operações com peça identificada.`, false);
   } else {
     showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o “Rel Planilhamento por Funcionário” (do Corte ou da Furação, .xlsx ou PDF) — as peças aparecem por lote.`);
   }
@@ -4043,6 +4157,11 @@ function applyPeca(prod, file){
 // zera as peças carregadas (pra recomeçar com outro conjunto de relatórios por Produto)
 function limparPecas(){
   PECA_MAP={}; PROD_FILES=[]; PROD_PERIOD="";
+  // o remendo de quantidade vem do "por Produto": limpando as peças ele também sai, e o
+  // recompletaPdf (embaixo) refaz a conta — senão o painel seguia mostrando quantidade de um
+  // relatório que o usuário mandou apagar, e sem dizer de onde ela veio
+  for(const k in PROD_OPS) delete PROD_OPS[k];
+  recompletaPdf();
   PROD_BUFS=[]; idbDel("produto").then(renderSalvoInfo);   // não voltam na próxima abertura
   setProdInfo("Peças carregadas limpas.", false);
   if(AGG||AGGF) redesenhaTudo();
@@ -4121,7 +4240,7 @@ function exportCsv(S){
   const invs=invasoesPorDia(S);
   if(invs.length){
     rows.push([]);
-    rows.push(["Invasão de dias — quem entrou no dia previsto de outro lote"]);
+    rows.push([`Invasão de dias — quem ${S.v.verbo} no dia previsto de outro lote`]);
     rows.push(["Dia","Dono do dia",S.v.Ac+" do dono","Lote invasor","Peça (código)","Peça (descrição)","Ordens","Operador","Máquina","Invadido (pç)","Antecipado (antes da própria prevista)","Atrasado (depois)","% do dia"]);
     for(const D of invs){
       const dono=D.donos.map(o=>o.mat+" "+o.lote).join(" · ");
@@ -4136,7 +4255,7 @@ function exportCsv(S){
   if(Object.keys(PECA_MAP).length){
     rows.push([]);
     rows.push(["Peças "+S.v.acs+" por lote"]);
-    rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"m² "+S.v.ac,"Medida (C x L mm)","Planejado","Data prevista",S.v.ult,"Máquina","Operador"]);
+    rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"m² "+S.v.ac,"Medida (C x L mm)","Planejado",S.v.prevCol,S.v.ult,"Máquina","Operador"]);
     const byLote=buildPecaLote(S);
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=S.meta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
@@ -4246,7 +4365,7 @@ function exportPorOperador(S){
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(iv), "Invasão");
   }
   if(Object.keys(PECA_MAP).length){   // aba extra: qual peça passou em cada lote
-    const aoa=[["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"Planejado","Data prevista",S.v.ult,"Máquina","Operador"]];
+    const aoa=[["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"Planejado",S.v.prevCol,S.v.ult,"Máquina","Operador"]];
     const byLote=buildPecaLote(S);
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
       const g=S.meta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";

@@ -150,12 +150,18 @@ Você exporta do sistema o relatório **“Rel Planilhamento por Funcionário”
   **O PDF nem sempre traz tudo.** O do **corte** (fase 50) sai completo — ORDEM, DATA, PRODUTO,
   QTDE, MÁQUINA, FUNCIONÁRIO e a linha `Lote :`. O da **furação** (fase 55) sai mais curto: **sem
   a coluna QTDE e sem a linha do lote**. Quando falta, o painel completa com o que já sabe e **diz
-  na tela o que completou**: a **quantidade** vem do “por Produto” (que traz ORDEM + DATA + QTDE
-  PROD.) e o **lote** vem de um relatório do mesmo setor já carregado, pelo nº da ORDEM. O que não
-  dá pra completar entra como **`SEM LOTE NO PDF`** — e aí dá pra ver dia, operador, peça e m²,
-  mas **não dá pra medir prazo, pulmão nem invasão**, que são por lote. Pra ter o lote: exporte o
-  mesmo relatório em **.xlsx** (a planilha traz a linha do lote) ou peça o PDF **com essa linha
-  ligada**, do jeito que o do corte já sai. A **Programação** continua sendo `.xlsx`.
+  na tela o que completou**, numa tarja que fica embaixo do nome do arquivo enquanto valer:
+  · a **quantidade** vem do “por Produto” (ORDEM + DATA + QTDE PROD.), casando **operação a
+    operação** — cada apontamento consome uma linha do “por Produto”, de preferência a da mesma
+    máquina e operador. É assim, e não pelo total do dia, porque a mesma ordem passa por duas
+    furadeiras no mesmo dia: repetir o total inflava a produção.
+  · o **lote** vem de um relatório do mesmo setor já carregado, pelo nº da **ORDEM**.
+  · a **ordem de carga não importa**: se o “por Produto” (ou o relatório que traz o lote) chegar
+    depois, o painel refaz a conta na hora.
+  O que não dá pra completar entra como **`SEM LOTE NO PDF`** — e aí dá pra ver dia, operador,
+  peça e m², mas **não dá pra medir prazo, pulmão nem invasão**, que são por lote. Pra ter o lote:
+  exporte o mesmo relatório em **.xlsx** (a planilha traz a linha do lote) ou peça o PDF **com essa
+  linha ligada**, do jeito que o do corte já sai. A **Programação** continua sendo `.xlsx`.
 - **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
   carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
   novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra
