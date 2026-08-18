@@ -2,8 +2,8 @@
 
 Painel estático para **comparar o que o setor Corte fez, por lote e por data**.
 
-Você exporta do sistema o relatório **“Rel Planilhamento por Funcionário” (.xlsx)**,
-arrasta o arquivo na tela e o painel monta na hora:
+Você exporta do sistema o relatório **“Rel Planilhamento por Funcionário”** — em **.xlsx** ou em
+**PDF** —, arrasta o arquivo na tela e o painel monta na hora:
 
 - **Cortado por lote & data** — a matriz consolidada (Data × Lote) que antes era feita na mão.
   Logo abaixo do nº do lote vem a linha **Programada**, com a data em que ele deveria estar cortado
@@ -141,6 +141,21 @@ arrasta o arquivo na tela e o painel monta na hora:
   só o arquivo da furação e o painel abre direto no setor Furação (o setor Corte fica apagado até
   ele ser carregado, porque é montado a partir dele). O PDF sai só com as seções do setor que está
   na tela.
+- **O relatório em PDF também serve** — o mesmo **“Rel Planilhamento por Funcionário”** e
+  **“Rel Planilhamento por Produto”**, exportados em **PDF**, entram do mesmo jeito: arraste na
+  tela ou use o botão. O painel lê a **camada de texto** do PDF (posição de cada pedaço de texto)
+  e remonta as colunas do formulário, então o caminho daí pra frente é o mesmo do `.xlsx` — mesma
+  detecção de setor, mesma tela, mesmo salvamento no navegador. Um PDF **digitalizado** (foto do
+  papel) não tem texto pra ler: o painel avisa em vez de mostrar tela vazia.
+  **O PDF nem sempre traz tudo.** O do **corte** (fase 50) sai completo — ORDEM, DATA, PRODUTO,
+  QTDE, MÁQUINA, FUNCIONÁRIO e a linha `Lote :`. O da **furação** (fase 55) sai mais curto: **sem
+  a coluna QTDE e sem a linha do lote**. Quando falta, o painel completa com o que já sabe e **diz
+  na tela o que completou**: a **quantidade** vem do “por Produto” (que traz ORDEM + DATA + QTDE
+  PROD.) e o **lote** vem de um relatório do mesmo setor já carregado, pelo nº da ORDEM. O que não
+  dá pra completar entra como **`SEM LOTE NO PDF`** — e aí dá pra ver dia, operador, peça e m²,
+  mas **não dá pra medir prazo, pulmão nem invasão**, que são por lote. Pra ter o lote: exporte o
+  mesmo relatório em **.xlsx** (a planilha traz a linha do lote) ou peça o PDF **com essa linha
+  ligada**, do jeito que o do corte já sai. A **Programação** continua sendo `.xlsx`.
 - **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
   carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
   novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra
@@ -156,7 +171,11 @@ arrasta o arquivo na tela e o painel monta na hora:
 Tudo roda **no navegador** — nenhum dado é enviado para a internet.
 
 ## Arquivos
-- `index.html` — o painel (HTML/CSS/JS autossuficiente; usa SheetJS via CDN para ler o `.xlsx`).
+- `index.html` — o painel (HTML/CSS/JS autossuficiente).
+- `xlsx.full.min.js` — SheetJS, para ler o `.xlsx`.
+- `pdf.min.js` + `pdf.worker.min.js` — pdf.js da Mozilla (Apache 2.0, `LICENSE-pdfjs.txt`), para ler o
+  mesmo relatório exportado em **PDF**. Ficam no repositório, e não em CDN, porque o painel roda em
+  máquina de fábrica e não pode depender de internet.
 - `vercel.json` — `/` → `index.html`.
 - `manifest.json` + ícones — PWA / marca Patrimar.
 

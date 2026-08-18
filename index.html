@@ -12,6 +12,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="xlsx.full.min.js"></script>
+<!-- leitor de PDF (pdf.js da Mozilla, Apache 2.0 — ver LICENSE-pdfjs.txt): o mesmo relatório do
+     ERP também sai em PDF, e é assim que ele chega em muita gente. Fica no repositório, não em
+     CDN, porque o painel roda em máquina de fábrica e não pode depender de internet. -->
+<script src="pdf.min.js"></script>
 <style>
 :root{
   --bg:#111111; --surface:#1C1C1C; --elevated:#222222; --border:#2A2A2A;
@@ -574,12 +578,12 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   <div id="drop">
     <div class="icon">📄</div>
     <div class="big">Arraste aqui o relatório do sistema</div>
-    <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> (.xlsx) que você exporta do sistema —
+    <div class="sub">O arquivo <b>“Rel Planilhamento por Funcionário”</b> — em <b>.xlsx</b> ou em <b>PDF</b>, do jeito que você exporta do sistema —
       o do <b>Corte</b> ou o da <b>Furação</b> (o painel reconhece pela máquina; só o da furação também funciona).
       O painel monta a comparação por lote e data automaticamente — nada é enviado pra internet, tudo roda no seu navegador.</div>
     <div class="btn">Selecionar arquivo</div>
-    <div class="hint">.xlsx exportado do sistema · fica tudo local · o último arquivo fica salvo neste navegador e volta sozinho</div>
-    <input type="file" id="file" accept=".xlsx,.xls" class="hidden">
+    <div class="hint">.xlsx ou .pdf exportado do sistema · fica tudo local · o último arquivo fica salvo neste navegador e volta sozinho</div>
+    <input type="file" id="file" accept=".xlsx,.xls,.pdf" class="hidden">
   </div>
   <div id="err" class="err hidden"></div>
 
@@ -687,7 +691,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
         <button class="linkbtn" id="btn-prod" style="margin:0">⇩ Carregar relatório por Produto (.xlsx)</button>
         <button class="linkbtn" id="btn-prod-limpar" style="margin:0">Limpar peças carregadas</button>
         <span id="prod-info" class="prog-info"></span>
-        <input type="file" id="file-prod" accept=".xlsx,.xls" class="hidden">
+        <input type="file" id="file-prod" accept=".xlsx,.xls,.pdf" class="hidden">
       </div>
       <div id="peca-empty" class="sec-sub" style="display:none">Carregue o <b>“Rel Planilhamento por Produto”</b> (mesmo período do corte) para ver as peças de cada lote. Você também pode simplesmente arrastar esse arquivo na tela.</div>
       <div id="peca-warn" class="peca-warn" style="display:none"></div>
@@ -1030,6 +1034,17 @@ try{ PROG_MAP = JSON.parse(localStorage.getItem(LS_PROG)||"{}"); }catch(e){ PROG
   }
 })();
 let PECA_MAP = {};   // ordem(number) -> {cod,desc,qtdeOrdem} — do relatório "por Produto". Chave: nº da ORDEM. Só na sessão (não persiste).
+/* "ordem|data" -> QTDE PROD. e ordem -> lote: os dois remendos para PDF incompleto.
+   O relatório por Funcionário exportado em PDF nem sempre traz a coluna QTDE e a linha "Lote"
+   (o do corte traz; o da furação, na fase 55, não). Quando faltar, o painel completa com o que
+   já sabe: a quantidade vem do "por Produto" (que traz ORDEM + DATA + QTDE PROD.) e o lote vem
+   de um relatório do mesmo setor já carregado. O que não der pra completar é DITO na tela, não
+   inventado. */
+const PROD_QTDE = {};
+const LOTE_ORDEM = {};
+// nome do "lote" das operações que vieram sem lote — aparece assim na tela, pra ninguém
+// confundir com lote de verdade
+const LOTE_DESCONHECIDO = "SEM LOTE NO PDF";
 // Lotes OCULTOS (ex.: reposição de lote antigo que só suja o painel). Sai de TUDO — KPIs,
 // matriz, rankings e exports — e fica listado numa barra pra reexibir. Persiste no navegador.
 const LS_OCULTOS = "rastreioCorte:ocultos";
@@ -1040,12 +1055,13 @@ let CORTE_NOME = "";  // nome do arquivo de Corte carregado (a barra do topo mos
 let LAST_PERIOD = ""; // "Período de:" declarado no último arquivo (pra re-renderizar ao ocultar)
 function salvaOcultos(){ try{ localStorage.setItem(LS_OCULTOS, JSON.stringify([...OCULTOS])); }catch(e){} }
 function aplicaOcultos(){
-  if(!RAW_RECS.length) return;
-  AGG = aggregate(RAW_RECS.filter(r=>!OCULTOS.has(r.lote)));
+  if(!RAW_RECS.length && !RAW_RECS_FUR.length) return;
+  if(RAW_RECS.length)     AGG  = aggregate(RAW_RECS.filter(r=>!OCULTOS.has(r.lote)));
   if(RAW_RECS_FUR.length) AGGF = aggregate(RAW_RECS_FUR.filter(r=>!OCULTOS.has(r.lote)));
-  renderAll(LAST_PERIOD);
+  // no modo "só furação" não há AGG pra renderAll: aí redesenha direto os dois setores
+  if(AGG) renderAll(LAST_PERIOD); else redesenhaTudo();
 }
-let FUNC_PERIOD = "";   // "Período de:" do relatório de Corte (por Funcionário)
+let FUNC_PERIOD = "";   // período do Corte, guardado só p/ comparar com o do "por Produto"
 let PROD_PERIOD = "";   // "Período de:" do último relatório por Produto — p/ avisar se forem períodos diferentes
 // Dá pra carregar VÁRIOS relatórios por Produto (um por período): os mapas ordem->peça vão se somando.
 // É o que resolve o caso "o Corte é de 23/07 a 30/07 mas o Produto exportado é só de um dia".
@@ -1296,7 +1312,12 @@ function materiaisDoLote(lote, S){
 /* ---------- parse workbook ---------- */
 function parseWorkbook(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  return parseFuncRows(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}));
+}
+/* O miolo, separado do .xlsx de propósito: o relatório também sai em PDF, e o leitor de PDF
+   entrega as MESMAS linhas (ver pdfParaAoaFunc). Assim a leitura do relatório é uma só —
+   se o ERP mudar o jeito de escrever, muda num lugar. */
+function parseFuncRows(rows){
   let period="", curFunc=null, curFuncCod="", lastOp=null;
   const recs=[];
   for(const row of rows){
@@ -1314,6 +1335,7 @@ function parseWorkbook(wb){
         const m = desc.match(/LT\s?\d+\/\d+/);
         lastOp.lote = m ? m[0].replace(/\s+/g," ").toUpperCase() : (desc||"—");
         lastOp.loteDesc = desc;
+        if(m) LOTE_ORDEM[lastOp.ordem]={lote:lastOp.lote, desc:lastOp.loteDesc};   // p/ completar PDF sem lote
         recs.push(lastOp); lastOp=null;
       }
       continue;
@@ -1385,8 +1407,11 @@ function parseProgramacao(wb){
    Contar uma vez só por ordem fazia o painel acusar sobra de "+200" numa ordem que estava exata. */
 function parseProduto(wb){
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  const map={}; let n=0, cur=null, period="", hibridas=0; const datas=new Set();
+  return parseProdutoRows(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}));
+}
+// mesma ideia do parseFuncRows: o PDF do "por Produto" cai aqui pelas mesmas linhas
+function parseProdutoRows(rows){
+  const map={}, qprod={}; let n=0, cur=null, period="", hibridas=0; const datas=new Set();
   for(const row of rows){
     const c = row||[];
     for(const cell of c){ if(typeof cell==="string" && cell.indexOf("Período")>=0){ period=cell.replace(/^\s*Período de:?\s*/i,"").trim(); } }
@@ -1406,11 +1431,18 @@ function parseProduto(wb){
         const e=map[c[0]]||(map[c[0]]={cod:cur.cod, desc:cur.desc, qtdeOrdem:0});
         e.qtdeOrdem+=Math.trunc(parseBR(c[1])); n++;      // QTDE ORDEM soma por linha (ver acima)
       }
-      if(typeof c[3]==="string" && /\d\d?\/\d\d?\/\d\d/.test(c[3])) datas.add(c[3].trim());
+      const dt=(typeof c[3]==="string" && /\d\d?\/\d\d?\/\d\d/.test(c[3])) ? c[3].trim() : "";
+      if(dt) datas.add(dt);
+      // ORDEM+DATA → QTDE PROD.: é daqui que sai a quantidade quando o relatório por
+      // Funcionário vem SEM a coluna QTDE (o PDF de algumas fases não traz essa coluna).
+      // Soma DENTRO do arquivo (a mesma ordem volta em mais de uma linha); entre arquivos,
+      // quem junta é o applyPeca — somar lá dobraria a quantidade de períodos sobrepostos.
+      const qp=Math.trunc(parseBR(c[2]));
+      if(dt && qp>0) qprod[c[0]+"|"+dt]=(qprod[c[0]+"|"+dt]||0)+qp;
       continue;
     }
   }
-  return {map,n,period,hibridas,datas:[...datas].sort((a,b)=>brToDate(a)-brToDate(b))};
+  return {map,n,period,hibridas,qprod,datas:[...datas].sort((a,b)=>brToDate(a)-brToDate(b))};
 }
 
 /* ---------- aggregate ---------- */
@@ -3224,7 +3256,7 @@ function redesenhaTudo(){
 
 function renderAll(period){
   // vale o período das datas do arquivo, não o que o sistema declara no cabeçalho
-  FUNC_PERIOD = periodoDosDados(AGG.datas) || period || "";
+  FUNC_PERIOD = SC.periodo() || period || "";
   LAST_PERIOD = period || "";
   SC.opFilter="";                     // novo arquivo volta pra "Todos"
   redesenhaTudo();
@@ -3237,6 +3269,9 @@ function setProgInfo(msg, warn){ const e=document.getElementById("prog-info"); i
 
 /* ---------- file handling ---------- */
 function showErr(msg){ const e=document.getElementById("err"); e.textContent="⚠ "+msg; e.classList.remove("hidden"); }
+// versão para os avisos que o próprio painel escreve (com <b> pra destacar o que importa).
+// Texto que vem de fora — nome de arquivo, mensagem de erro do navegador — vai por showErr.
+function showErrHtml(html){ const e=document.getElementById("err"); e.innerHTML="⚠ "+html; e.classList.remove("hidden"); }
 function clearErr(){ document.getElementById("err").classList.add("hidden"); }
 
 function handleFile(file){
@@ -3246,9 +3281,15 @@ function handleFile(file){
   rdr.onerror=()=>showErr("Não consegui abrir o arquivo.");
   rdr.readAsArrayBuffer(file);
 }
+// PDF ou planilha? Olha os bytes, não a extensão: arquivo renomeado é comum aqui.
+function ehPdf(buf){
+  const b=new Uint8Array(buf.slice(0,5));
+  return b[0]===0x25&&b[1]===0x50&&b[2]===0x44&&b[3]===0x46;   // "%PDF"
+}
 /* Lê os bytes de um .xlsx e descobre o que ele é (Corte, por Produto ou Programação).
    salvar=true guarda o arquivo no navegador; na restauração vem false — os bytes já vieram de lá. */
-function processaArquivo(nome, buf, salvar){
+async function processaArquivo(nome, buf, salvar){
+  if(ehPdf(buf)) return processaPdfArquivo(nome, buf, salvar);
   try{
     const wb=XLSX.read(new Uint8Array(buf),{type:"array"});
     const {period,recs}=parseWorkbook(wb);
@@ -3258,59 +3299,663 @@ function processaArquivo(nome, buf, salvar){
       if(prod.n){ applyPeca(prod,{name:nome}); if(salvar) guardaProduto(nome,buf); return true; }
       const prog=parseProgramacao(wb);
       if(prog.n){ applyProg(prog,{name:nome}); return true; }   // a Programação já persiste no localStorage
-      showErr("Não encontrei linhas de corte neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
+      showErr("Não encontrei linhas de operação neste arquivo. Confira se é o relatório “Rel Planilhamento por Funcionário” (se for o “por Produto”, use o botão “Carregar relatório por Produto” na seção Peças; se for a Programação, o botão em Prazo por lote).");
       return false;
     }
-    // FURAÇÃO: mesmo relatório, outro setor. A regra é POR ARQUIVO, não por linha: o export
-    // da furação vem com FURADEIRAS e também TORNOS CNC do setor — se a triagem fosse por
-    // máquina, os tornos "sobrariam" e SUBSTITUIRIAM o corte na tela (visto em arquivo real).
-    // Então: tem furadeira e NENHUMA seccionadora → o arquivo INTEIRO é furação (tornos
-    // incluídos, como o painel do corte já conta tudo do arquivo dele) e o corte carregado
-    // não é tocado. Só divide por máquina no caso raro de um export misto (SEC + FUR juntos).
-    const temFur=recs.some(r=>isFurMaq(r.maq)), temCorte=recs.some(r=>isCorteMaq(r.maq));
-    let furRecs=[], corteRecs=recs;
-    if(temFur && !temCorte){ furRecs=recs; corteRecs=[]; }
-    else if(temFur && temCorte){ furRecs=recs.filter(r=>isFurMaq(r.maq)); corteRecs=recs.filter(r=>!isFurMaq(r.maq)); }
-    if(furRecs.length){
-      RAW_RECS_FUR=furRecs; FUR_NOME=nome;
-      AGGF=aggregate(furRecs.filter(r=>!OCULTOS.has(r.lote)));
+    return aplicaRecs(nome, buf, period, recs, salvar);
+  }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); return false; }
+}
+
+/* Coloca na tela as operações lidas de um relatório por Funcionário — venha ele de .xlsx ou de
+   PDF, o caminho daqui pra frente é o mesmo.
+   FURAÇÃO: mesmo relatório, outro setor. A regra é POR ARQUIVO, não por linha: o export
+   da furação vem com FURADEIRAS e também TORNOS CNC do setor — se a triagem fosse por
+   máquina, os tornos "sobrariam" e SUBSTITUIRIAM o corte na tela (visto em arquivo real).
+   Então: tem furadeira e NENHUMA seccionadora → o arquivo INTEIRO é furação (tornos
+   incluídos, como o painel do corte já conta tudo do arquivo dele) e o corte carregado
+   não é tocado. Só divide por máquina no caso raro de um export misto (SEC + FUR juntos). */
+function aplicaRecs(nome, buf, period, recs, salvar){
+  const temFur=recs.some(r=>isFurMaq(r.maq)), temCorte=recs.some(r=>isCorteMaq(r.maq));
+  let furRecs=[], corteRecs=recs;
+  if(temFur && !temCorte){ furRecs=recs; corteRecs=[]; }
+  else if(temFur && temCorte){ furRecs=recs.filter(r=>isFurMaq(r.maq)); corteRecs=recs.filter(r=>!isFurMaq(r.maq)); }
+  if(furRecs.length){
+    RAW_RECS_FUR=furRecs; FUR_NOME=nome;
+    AGGF=aggregate(furRecs.filter(r=>!OCULTOS.has(r.lote)));
+  }
+  if(!corteRecs.length){
+    if(salvar) guardaFur(nome,buf);
+    if(AGG){ renderSetor(SF); renderFurBarra(); renderFilebar(); aplicaAba(); if(salvar) setSetor("fur"); }
+    else mostraPainelFur();   // sem o Corte, o painel abre no modo "só furação"
+    return true;
+  }
+  RAW_RECS=corteRecs; LAST_PERIOD=period; CORTE_NOME=nome;
+  AGG=aggregate(corteRecs.filter(r=>!OCULTOS.has(r.lote)));
+  document.getElementById("drop").classList.add("hidden");
+  document.getElementById("painel").classList.remove("hidden");
+  document.getElementById("painel").classList.remove("so-fur");   // o Corte chegou: painel completo
+  document.getElementById("filebar").style.display="flex";
+  renderAll(period);
+  if(salvar) guardaCorte(nome,buf);
+  return true;
+}
+
+
+/* ============================================================================
+   leitor-pdf.js — lê os relatórios do ERP (Lógica/Produção) em PDF e devolve
+   as MESMAS "linhas de planilha" (array de arrays) que o painel já consome do
+   .xlsx. A ideia é não mexer nos parsers do painel: o PDF entra por aqui e sai
+   no formato aoa que parseWorkbook()/parseProduto() já sabem ler.
+
+   Roda NO NAVEGADOR: só funções globais, ES2018, sem require/import, sem
+   optional chaining e sem "??" (o painel é um HTML estático servido pra
+   máquinas antigas do chão de fábrica). A única dependência é o pdfjsLib, que
+   vem por PARÂMETRO — assim o painel escolhe de onde carregar o pdf.js.
+
+   ---------------------------------------------------------------------------
+   POR QUE ESSE CAMINHO (x,y) E NÃO O TEXTO CORRIDO DO PDF
+   ---------------------------------------------------------------------------
+   O relatório do ERP é um formulário de largura fixa impresso em PDF. Se a
+   gente pegar tc.items na ordem em que vêm, o texto sai embaralhado: o ERP
+   escreve MÁQUINA e FUNCIONÁRIO de uma operação ANTES de escrever a ORDEM da
+   mesma operação. Só a coordenada (x,y) recompõe a linha. Por isso todo o
+   leitor trabalha em cima de x (coluna) e y (linha).
+   ============================================================================ */
+
+/* --- Tolerâncias, todas medidas nos 4 PDFs reais de exemplo ---------------- */
+
+/* Uma mesma operação vem espalhada em até 3 valores de y (ex.: 627.5 = máquina,
+   626.5 = ordem/qtde, 626 = produto). A menor distância REAL entre duas linhas
+   lógicas diferentes que eu medi foi 11 (relatório por Produto) e 12,5 (por
+   Funcionário). Então 3 separa com folga: junta o que é da mesma operação e
+   nunca alcança a linha de baixo. */
+var PDF_TOL_LINHA = 3;
+
+/* Trava de segurança contra "efeito dominó": y=700, 698, 696... encadearia tudo
+   numa linha só se eu olhasse apenas o vizinho. O maior espalhamento real
+   medido foi 2,0 (627.5 → 625.5), então 6 é teto confortável. */
+var PDF_TOL_SPAN = 6;
+
+/* Números vêm alinhados à DIREITA: o x do item fica ANTES do x do rótulo da
+   coluna (ex.: rótulo QTDE em 146,4 e o valor "1.360,0000" começando em 141,8).
+   Por isso a fronteira entre duas colunas não é o meio: ela é recuada um pouco
+   à esquerda do rótulo da coluna da direita. 8pt cobriu todos os casos reais
+   sem invadir a coluna anterior. */
+var PDF_FOLGA_MAX = 8;
+
+/* Fração do vão entre dois rótulos usada como recuo quando as colunas são
+   estreitas — evita que a folga fixa de 8pt "coma" a coluna vizinha. */
+var PDF_FOLGA_FRAC = 0.35;
+
+/* --- Padrões de conteúdo -------------------------------------------------- */
+/* O reconhecimento por posição sozinho é frágil quando um número cresce e
+   transborda pra esquerda. Então a posição escolhe a REGIÃO e o padrão de texto
+   confirma o CAMPO. Os dois juntos erram muito menos que qualquer um sozinho. */
+var PDF_RE_ORDEM = /^\d{3,}$/;                       /* 800803, 801730 ...      */
+var PDF_RE_DATA  = /^\d{2}\/\d{2}\/\d{2,4}$/;        /* 17/08/26                */
+var PDF_RE_PECA  = /^\d{3}\.\d{3}\.\d{3}$/;          /* 763.014.116             */
+var PDF_RE_QTDE  = /^\d{1,3}(\.\d{3})*,\d+$/;        /* 350,0000 / 1.360,0000   */
+
+/* Rótulos de coluna que o ERP imprime, normalizados -> nome canônico.
+   Vem com variação de acento e de ponto ("VLR.CUSTO" no retrato, "VLR. CUSTO"
+   no paisagem), então mapeio as duas grafias em vez de tentar adivinhar. */
+var PDF_ROTULOS = {
+  "ORDEM": "ORDEM",
+  "QTDE": "QTDE", "QTDE PROD.": "QTDE_PROD", "QTDE PROD": "QTDE_PROD",
+  "QTDE ORDEM": "QTDE_ORDEM",
+  "DATA": "DATA",
+  "PRODUTO": "PRODUTO",
+  "MAQUINA": "MAQUINA", "MÁQUINA": "MAQUINA",
+  "FUNCIONARIO": "FUNCIONARIO", "FUNCIONÁRIO": "FUNCIONARIO",
+  "HR.INICIO": "HR_INICIO", "HR.INÍCIO": "HR_INICIO",
+  "HR.FIM": "HR_FIM",
+  "FS": "FS",
+  "HORAS": "HORAS",
+  "VLR.CUSTO": "VLR_CUSTO", "VLR. CUSTO": "VLR_CUSTO"
+};
+
+/* ==========================================================================
+   1) EXTRAÇÃO — PDF -> linhas lógicas
+   ========================================================================== */
+
+/* Normaliza texto de item pra comparação de rótulo: caixa alta, espaços
+   colapsados e sem o " :" que o ERP gruda no fim ("Lote :", "FUNCIONÁRIO :"). */
+function pdfNorm(s) {
+  return String(s == null ? "" : s).replace(/\s+/g, " ").trim().replace(/\s*:\s*$/, "").toUpperCase();
+}
+
+/* "1.360,0000" -> 1360. Devolve null quando não é número, pra diferenciar
+   "campo ausente" de "campo zero" — o painel trunca depois, aqui é o valor cru. */
+function pdfNum(s) {
+  if (s == null) return null;
+  var t = String(s).trim();
+  if (!t) return null;
+  t = t.replace(/\./g, "").replace(",", ".");
+  var v = parseFloat(t);
+  return isNaN(v) ? null : v;
+}
+
+/* Lixo do template: o relatório desenha as bordas do formulário com ";" e as
+   marcas de margem "»"/"«". São itens de texto de verdade, então se não forem
+   descartados aqui eles entram nas colunas e estragam a leitura. */
+function pdfEhLixo(s) {
+  return !s || /^[;»«|\s]+$/.test(s);
+}
+
+/* PDF -> [{pagina, y, itens:[{x,s}]}] com as linhas já remontadas.
+   'bytes' é copiado porque o pdf.js pode transferir (detach) o ArrayBuffer pro
+   worker; sem a cópia o mesmo arquivo não poderia ser lido duas vezes. */
+async function pdfLinhas(bytes, pdfjsLib) {
+  var tarefa = pdfjsLib.getDocument({
+    data: new Uint8Array(bytes),
+    isEvalSupported: false,   /* CSP do painel estático não permite eval        */
+    disableFontFace: true     /* só queremos texto; não vale baixar/instalar fonte */
+  });
+  var doc = await tarefa.promise;
+  var saida = [];
+
+  for (var p = 1; p <= doc.numPages; p++) {
+    var pg = await doc.getPage(p);
+    var tc = await pg.getTextContent();
+
+    /* Passo 1: agrupa por y EXATO. Vários itens dividem o mesmo y. */
+    var porY = {};
+    for (var i = 0; i < tc.items.length; i++) {
+      var it = tc.items[i];
+      var s = (typeof it.str === "string") ? it.str.replace(/\s+/g, " ").trim() : "";
+      if (pdfEhLixo(s)) continue;
+      /* Arredondo o y em 2 casas só pra evitar chaves tipo 701.4999999996 vindas
+         do float do PDF; o agrupamento de verdade é o encadeamento abaixo. */
+      var y = Math.round(it.transform[5] * 100) / 100;
+      var x = Math.round(it.transform[4] * 10) / 10;
+      if (!porY[y]) porY[y] = [];
+      porY[y].push({ x: x, s: s });
     }
-    if(!corteRecs.length){
-      if(salvar) guardaFur(nome,buf);
-      if(AGG){ renderSetor(SF); renderFurBarra(); aplicaAba(); if(salvar) setSetor("fur"); }
-      else mostraPainelFur();   // sem o Corte, o painel abre no modo "só furação"
+
+    /* Passo 2: encadeia os y próximos (de cima pra baixo). A linha lógica é o
+       cluster; o y do cluster é o do TOPO, que é o que o olho lê como a linha. */
+    var ys = Object.keys(porY).map(Number).sort(function (a, b) { return b - a; });
+    var atual = null, anterior = null;
+    for (var k = 0; k < ys.length; k++) {
+      var yk = ys[k];
+      var junta = atual && (anterior - yk) <= PDF_TOL_LINHA && (atual.y - yk) <= PDF_TOL_SPAN;
+      if (junta) {
+        atual.itens = atual.itens.concat(porY[yk]);
+      } else {
+        atual = { pagina: p, y: yk, itens: porY[yk].slice() };
+        saida.push(atual);
+      }
+      anterior = yk;
+    }
+  }
+
+  /* Passo 3: cada linha em ordem de leitura (esquerda -> direita). Sem isso o
+     "primeiro item da zona da MÁQUINA" não seria necessariamente o código. */
+  for (var j = 0; j < saida.length; j++) {
+    saida[j].itens.sort(function (a, b) { return a.x - b.x; });
+  }
+  return saida;
+}
+
+/* ==========================================================================
+   2) IDENTIFICAÇÃO DO RELATÓRIO
+   ========================================================================== */
+
+/* O título fica no alto de toda página: "REL.PLANILHAMENTO POR FUNCIONÁRIO"
+   (retrato) ou "REL. PLANILHAMENTO POR PRODUTO" (paisagem). Repare no espaço
+   depois de "REL." que só existe num deles — por isso comparo sem pontuação. */
+function pdfDetectaTipo(linhas) {
+  var n = Math.min(linhas.length, 60);
+  for (var i = 0; i < n; i++) {
+    var t = pdfLinhaTexto(linhas[i]).replace(/[.\s]+/g, " ").toUpperCase();
+    if (t.indexOf("REL PLANILHAMENTO POR FUNCION") >= 0) return "func";
+    if (t.indexOf("REL PLANILHAMENTO POR PRODUTO") >= 0) return "produto";
+  }
+  /* Reserva: se o título não veio (recorte, versão diferente do formulário),
+     o cabeçalho de grupo resolve — "FUNCIONÁRIO :" x "PRODUTO :". */
+  for (var j = 0; j < linhas.length; j++) {
+    var g = pdfNorm(linhas[j].itens.length ? linhas[j].itens[0].s : "");
+    if (g === "FUNCIONARIO" || g === "FUNCIONÁRIO") return "func";
+    if (g === "PRODUTO") return "produto";
+  }
+  return "";
+}
+
+function pdfLinhaTexto(l) {
+  var out = [];
+  for (var i = 0; i < l.itens.length; i++) out.push(l.itens[i].s);
+  return out.join(" ");
+}
+
+/* ==========================================================================
+   3) COLUNAS — do cabeçalho para as fronteiras em x
+   ========================================================================== */
+
+/* O cabeçalho de colunas se repete a cada bloco (funcionário/produto), mas NÃO
+   é reimpresso quando a página quebra no meio de um bloco. Por isso o mapa de
+   colunas é sempre o ÚLTIMO cabeçalho visto, e vale até aparecer outro. */
+function pdfEhCabecalho(l) {
+  var temOrdem = false, temData = false;
+  for (var i = 0; i < l.itens.length; i++) {
+    var n = pdfNorm(l.itens[i].s);
+    if (n === "ORDEM") temOrdem = true;
+    if (n === "DATA") temData = true;
+  }
+  return temOrdem && temData;
+}
+
+/* Monta [{nome, x, ini}] ordenado por x. 'ini' é onde a coluna COMEÇA a valer:
+   o rótulo recuado à esquerda, porque número alinhado à direita começa antes
+   do rótulo. Itens não reconhecidos são ignorados — pode ser uma linha de
+   operação que grudou no cabeçalho por proximidade de y. */
+function pdfMapaColunas(l) {
+  var cols = [];
+  for (var i = 0; i < l.itens.length; i++) {
+    var nome = PDF_ROTULOS[pdfNorm(l.itens[i].s)];
+    if (nome) cols.push({ nome: nome, x: l.itens[i].x, ini: 0 });
+  }
+  cols.sort(function (a, b) { return a.x - b.x; });
+  for (var k = 0; k < cols.length; k++) {
+    if (k === 0) {
+      cols[k].ini = -Infinity;                 /* tudo à esquerda é da 1ª coluna */
+    } else {
+      var vao = cols[k].x - cols[k - 1].x;
+      var folga = Math.min(PDF_FOLGA_MAX, vao * PDF_FOLGA_FRAC);
+      cols[k].ini = cols[k].x - folga;
+    }
+  }
+  return cols;
+}
+
+function pdfIniDe(cols, nome) {
+  for (var i = 0; i < cols.length; i++) if (cols[i].nome === nome) return cols[i].ini;
+  return null;
+}
+function pdfTemCol(cols, nome) { return pdfIniDe(cols, nome) !== null; }
+
+/* Todos os itens que caem na zona de uma coluna, já em ordem de x. */
+function pdfItensDaCol(l, cols, nome) {
+  var ini = null, fim = Infinity;
+  for (var i = 0; i < cols.length; i++) {
+    if (cols[i].nome === nome) { ini = cols[i].ini; if (i + 1 < cols.length) fim = cols[i + 1].ini; break; }
+  }
+  if (ini === null) return [];
+  var out = [];
+  for (var j = 0; j < l.itens.length; j++) {
+    var it = l.itens[j];
+    if (it.x >= ini && it.x < fim) out.push(it);
+  }
+  return out;
+}
+
+/* Primeiro item da zona que casa com um padrão (ou null). */
+function pdfAchaNaCol(l, cols, nome, re) {
+  var its = pdfItensDaCol(l, cols, nome);
+  for (var i = 0; i < its.length; i++) if (re.test(its[i].s)) return its[i].s;
+  return null;
+}
+
+/* Código + nome de MÁQUINA/FUNCIONÁRIO: o ERP imprime os dois na mesma coluna,
+   o código no x do rótulo e o nome ~25pt à direita. Como já ordenei por x, o
+   primeiro é o código e o resto é o nome (nomes longos podem vir picotados). */
+function pdfCodENome(l, cols, nome) {
+  var its = pdfItensDaCol(l, cols, nome);
+  if (!its.length) return { cod: "", nome: "" };
+  var partes = [];
+  for (var i = 1; i < its.length; i++) partes.push(its[i].s);
+  return { cod: its[0].s, nome: partes.join(" ").trim() };
+}
+
+/* ==========================================================================
+   4) LINHAS DE CONTEXTO (cabeçalho de página, grupo, lote, totais)
+   ========================================================================== */
+
+/* O ERP fecha cada bloco com "Total de horas : 0,040000". Essa linha às vezes
+   encosta (em y) na última operação do bloco ou no cabeçalho do bloco seguinte —
+   é o mesmo defeito que o painel já trata no .xlsx, onde o rótulo cai na coluna
+   do NOME DA MÁQUINA. Aqui a solução é cortar a linha no rótulo: tudo a partir
+   dele pertence à linha de totais, não à linha de dados. É seguro porque nos 4
+   formulários o rótulo é impresso na faixa dos HORÁRIOS (x 405 a 533), depois de
+   todas as colunas que este leitor lê (ordem, data, produto, qtde, máquina,
+   funcionário). Nunca corta um campo útil. */
+function pdfSemTotais(l) {
+  for (var i = 0; i < l.itens.length; i++) {
+    if (/^TOTAL DE HORAS/.test(pdfNorm(l.itens[i].s))) {
+      return { pagina: l.pagina, y: l.y, itens: l.itens.slice(0, i) };
+    }
+  }
+  return l;
+}
+
+/* Cabeçalho/rodapé que se repete em TODA página. Precisa sair antes de qualquer
+   tentativa de leitura: senão "Período de :" e "Página: 2" viram linha de dados
+   da página 2 em diante, quando o mapa de colunas já existe. */
+function pdfEhChromePagina(l) {
+  var t = pdfLinhaTexto(l).toUpperCase();
+  return /PATRIMAR MOVEIS|^CNPJ:|CNPJ:/.test(t) ||
+         /PÁGINA:|PAGINA:/.test(t) ||
+         /REL\.?\s*PLANILHAMENTO/.test(t) ||
+         /PERÍODO DE|PERIODO DE/.test(t);
+}
+
+/* "Período de : 17/08/26 Até : 17/08/26 ... Fase : 50" — as datas e a fase vêm
+   como itens separados, então remonto pelo texto inteiro da linha.
+   ATENÇÃO documentada no painel: esse período MENTE em alguns arquivos; quem
+   manda é a data das operações. Aqui só reporto o que está impresso. */
+function pdfLePeriodo(linhas) {
+  for (var i = 0; i < linhas.length; i++) {
+    var t = pdfLinhaTexto(linhas[i]);
+    if (!/Per[ií]odo de/i.test(t)) continue;
+    var datas = t.match(/\d{2}\/\d{2}\/\d{2,4}/g) || [];
+    var fase = t.match(/Fase\s*:?\s*(\d+)/i);
+    return {
+      de: datas[0] || "",
+      ate: datas[1] || datas[0] || "",
+      fase: fase ? fase[1] : "",
+      texto: "Período de: " + (datas[0] || "") + " até " + (datas[1] || datas[0] || "")
+    };
+  }
+  return { de: "", ate: "", fase: "", texto: "" };
+}
+
+/* [{x:19.5,"Lote :"},{43.8,"025079"},{89.5,"LT 152/26 HOME RIPADO..."}] */
+function pdfEhLote(l) {
+  return l.itens.length >= 2 && pdfNorm(l.itens[0].s) === "LOTE";
+}
+
+/* Cabeçalho de bloco: "FUNCIONÁRIO : 661 NOME : DANIEL..." ou
+   "PRODUTO : 385.003.001 PRINCESA TAMPO 960X350X12...". */
+function pdfEhGrupo(l, rotulo) {
+  return l.itens.length >= 2 && pdfNorm(l.itens[0].s) === rotulo;
+}
+
+/* Separa código e descrição de um cabeçalho de bloco. Quando existe o rótulo
+   "NOME :" no meio (caso do funcionário), o nome é o que vem DEPOIS dele. */
+function pdfLeGrupo(l) {
+  var its = l.itens;
+  var cod = its.length > 1 ? its[1].s : "";
+  var iNome = -1;
+  for (var i = 2; i < its.length; i++) if (pdfNorm(its[i].s) === "NOME") { iNome = i; break; }
+  var partes = [];
+  for (var j = (iNome >= 0 ? iNome + 1 : 2); j < its.length; j++) partes.push(its[j].s);
+  return { cod: cod, desc: partes.join(" ").trim() };
+}
+
+/* ==========================================================================
+   5) "Rel Planilhamento por Funcionário" -> aoa
+   ==========================================================================
+   Formato de saída (o mesmo que o parseWorkbook() do painel já lê do .xlsx):
+     ["Rel Planilhamento por Funcionário"]
+     ["Período de: dd/mm/aa até dd/mm/aa"]
+     [null,"FUNCIONÁRIO", <cód>, <nome>]
+     [<ORDEM number>, null, <QTDE PROD.>, "<dd/mm/aa>", <máqCód>, <máqNome>, <funcCód>, <funcNome>]
+     ["Lote", <id interno>, "LT 152/26 DESCRIÇÃO"]
+   O cabeçalho de colunas NÃO é emitido: o painel só o descartaria (c[0]==="ORDEM"),
+   e não emiti-lo elimina de saída o caso do cabeçalho grudado numa operação. */
+function pdfParaAoaFunc(linhas) {
+  var rows = [["Rel Planilhamento por Funcionário"]];
+  var periodo = pdfLePeriodo(linhas);
+  if (periodo.texto) rows.push([periodo.texto]);
+
+  var cols = null, nOps = 0, temQtde = false, temLote = false;
+  var avisos = [];
+
+  for (var i = 0; i < linhas.length; i++) {
+    var l = pdfSemTotais(linhas[i]);
+    if (!l.itens.length) continue;
+    if (pdfEhChromePagina(l)) continue;
+
+    if (pdfEhCabecalho(l)) {
+      cols = pdfMapaColunas(l);
+      /* A fase 55 (furação) imprime um formulário mais curto: sem PRODUTO e sem
+         QTDE. Registro a partir do cabeçalho porque é o único lugar onde a
+         ausência é afirmativa — numa linha de dados "sem quantidade" poderia
+         ser só um valor em branco. */
+      if (pdfTemCol(cols, "QTDE") || pdfTemCol(cols, "QTDE_PROD")) temQtde = true;
+      continue;
+    }
+
+    if (pdfEhGrupo(l, "FUNCIONARIO") || pdfEhGrupo(l, "FUNCIONÁRIO")) {
+      var g = pdfLeGrupo(l);
+      rows.push([null, "FUNCIONÁRIO", g.cod, g.desc]);
+      continue;
+    }
+
+    if (pdfEhLote(l)) {
+      var idLote = l.itens.length > 1 ? l.itens[1].s : "";
+      var descPartes = [];
+      for (var d = 2; d < l.itens.length; d++) descPartes.push(l.itens[d].s);
+      rows.push(["Lote", idLote, descPartes.join(" ").trim()]);
+      temLote = true;
+      continue;
+    }
+
+    if (!cols) continue;                      /* nada legível antes do 1º cabeçalho */
+
+    var op = pdfLeOperacaoFunc(l, cols);
+    if (!op) continue;
+    rows.push(op);
+    nOps++;
+  }
+
+  if (!nOps) avisos.push("Nenhuma operação lida — o PDF pode ser digitalizado (sem camada de texto) ou não ser este relatório.");
+  if (!temQtde) avisos.push("Este relatório não traz a coluna QTDE: só dá para contar operações, não peças.");
+  if (!temLote) avisos.push("Este relatório não traz a linha 'Lote :': as ordens não têm lote.");
+
+  return { rows: rows, temQtde: temQtde, temLote: temLote, nOps: nOps, periodo: periodo, avisos: avisos };
+}
+
+/* Uma linha só é operação se tiver um número de ORDEM na zona da ORDEM. É o
+   critério mais barato e o mesmo que o painel usa (typeof c[0]==="number"). */
+function pdfLeOperacaoFunc(l, cols) {
+  var ordem = pdfAchaNaCol(l, cols, "ORDEM", PDF_RE_ORDEM);
+  if (!ordem) return null;
+
+  var data = pdfAchaNaCol(l, cols, "DATA", PDF_RE_DATA);
+  var maq = pdfCodENome(l, cols, "MAQUINA");
+  var fun = pdfCodENome(l, cols, "FUNCIONARIO");
+
+  /* PRODUTO e QTDE: aqui a posição sozinha não basta. Um número grande na QTDE
+     ("1.360,0000") começa 4,6pt à esquerda do rótulo e um número maior ainda
+     invadiria a zona do PRODUTO. Então pego TODOS os itens à esquerda da
+     máquina e classifico por conteúdo: código de peça tem a cara ddd.ddd.ddd,
+     quantidade tem vírgula decimal. Data e ordem já saíram acima. */
+  var xMaq = pdfIniDe(cols, "MAQUINA");
+  if (xMaq === null) xMaq = Infinity;
+  var peca = null, qtde = null;
+  for (var i = 0; i < l.itens.length; i++) {
+    var it = l.itens[i];
+    if (it.x >= xMaq) break;                            /* já ordenado por x */
+    if (it.s === ordem || it.s === data) continue;
+    if (!peca && PDF_RE_PECA.test(it.s)) { peca = it.s; continue; }
+    if (qtde === null && PDF_RE_QTDE.test(it.s)) { qtde = pdfNum(it.s); continue; }
+  }
+
+  /* Índice 1 fica vazio: o relatório por Funcionário não imprime QTDE ORDEM.
+     O painel não lê essa posição neste relatório — quem traz a quantidade
+     planejada é o "por Produto". */
+  return [Number(ordem), null, qtde, data || "", maq.cod, maq.nome, fun.cod, fun.nome, peca || ""];
+}
+
+/* ==========================================================================
+   6) "Rel Planilhamento por Produto" -> aoa
+   ==========================================================================
+     [null,"PRODUTO", <cód>, <descrição>]
+     [<ORDEM number>, <QTDE ORDEM>, <QTDE PROD.>, "<dd/mm/aa>", <máqCód>, <máqNome>, <funcCód>, <funcNome>]
+   Aqui as duas quantidades existem e têm a MESMA cara ("50,0000"), então quem
+   separa é a posição — e nesse formulário elas ficam a 72pt uma da outra, vão
+   de sobra. */
+function pdfParaAoaProduto(linhas) {
+  var rows = [["Rel Planilhamento por Produto"]];
+  var periodo = pdfLePeriodo(linhas);
+  if (periodo.texto) rows.push([periodo.texto]);
+
+  var cols = null, nOps = 0, avisos = [];
+
+  for (var i = 0; i < linhas.length; i++) {
+    var l = pdfSemTotais(linhas[i]);
+    if (!l.itens.length) continue;
+    if (pdfEhChromePagina(l)) continue;
+
+    if (pdfEhCabecalho(l)) { cols = pdfMapaColunas(l); continue; }
+
+    if (pdfEhGrupo(l, "PRODUTO")) {
+      var g = pdfLeGrupo(l);
+      rows.push([null, "PRODUTO", g.cod, g.desc]);
+      continue;
+    }
+
+    if (!cols) continue;
+
+    var ordem = pdfAchaNaCol(l, cols, "ORDEM", PDF_RE_ORDEM);
+    if (!ordem) continue;
+
+    var qOrd = pdfAchaNaCol(l, cols, "QTDE_ORDEM", PDF_RE_QTDE);
+    var qPrd = pdfAchaNaCol(l, cols, "QTDE_PROD", PDF_RE_QTDE);
+    var data = pdfAchaNaCol(l, cols, "DATA", PDF_RE_DATA);
+    var maq = pdfCodENome(l, cols, "MAQUINA");
+    var fun = pdfCodENome(l, cols, "FUNCIONARIO");
+
+    rows.push([Number(ordem), pdfNum(qOrd), pdfNum(qPrd), data || "", maq.cod, maq.nome, fun.cod, fun.nome]);
+    nOps++;
+  }
+
+  if (!nOps) avisos.push("Nenhuma operação lida — o PDF pode ser digitalizado (sem camada de texto) ou não ser este relatório.");
+
+  return { rows: rows, nOps: nOps, periodo: periodo, avisos: avisos };
+}
+
+
+/* ================= RELATÓRIO EM PDF =================
+   O mesmo relatório do ERP também sai em PDF, e é assim que ele chega em muita gente. O PDF
+   do sistema tem CAMADA DE TEXTO (não é imagem), então dá pra ler igual à planilha: o leitor
+   (ver "leitor de PDF" abaixo) devolve as MESMAS linhas de célula que o SheetJS devolveria, e
+   daí pra frente o caminho é o do .xlsx — mesmo parser, mesma detecção de setor, mesma tela.
+
+   O que o PDF às vezes NÃO traz (visto nos arquivos reais da fábrica):
+   · o PDF do corte (fase 50) traz ORDEM, DATA, PRODUTO, QTDE, MÁQUINA, FUNCIONÁRIO e a linha "Lote";
+   · o da furação (fase 55) vem mais magro: só ORDEM, DATA, MÁQUINA e FUNCIONÁRIO — sem QTDE e
+     sem a linha "Lote".
+   Quando falta, o painel completa com o que já sabe: a QUANTIDADE vem do "por Produto" (que traz
+   ORDEM + DATA + QTDE PROD.) e o LOTE vem de um relatório do mesmo setor já carregado (ORDEM →
+   lote). O que não der pra completar é DITO na tela — o painel não inventa número nem lote. */
+let PDF_LIB_AVISO=false;
+function pdfjsOk(){
+  if(typeof pdfjsLib==="undefined"){
+    if(!PDF_LIB_AVISO){ PDF_LIB_AVISO=true;
+      showErr("O leitor de PDF (pdf.min.js) não carregou junto com a página. Recarregue o painel; se continuar, use o relatório em .xlsx."); }
+    return false;
+  }
+  // o worker faz a leitura fora da thread da tela — sem ele um PDF grande trava o painel
+  pdfjsLib.GlobalWorkerOptions.workerSrc="pdf.worker.min.js";
+  return true;
+}
+
+// Fecha cada operação com uma linha "Lote" vazia — ver a chamada acima.
+function pdfFechaOperacoesSemLote(rows){
+  const out=[];
+  for(const r of rows){
+    out.push(r);
+    if(r && typeof r[0]==="number") out.push(["Lote","",""]);
+  }
+  return out;
+}
+
+/* Completa as operações lidas de um PDF incompleto. Devolve o que deu e o que faltou, pra
+   mensagem da tela dizer a verdade em vez de mostrar zero como se fosse produção zero. */
+function completaRecsDoPdf(recs, temQtde, temLote){
+  let semQtde=0, zeroQtde=0, semLote=0, comQtde=0, comLote=0;
+  for(const r of recs){
+    if(!temQtde){
+      const q=PROD_QTDE[r.ordem+"|"+r.data];
+      if(q>0){ r.qtde=q; comQtde++; }
+      // a ordem está no "por Produto" e não tem produção naquele dia: é zero MESMO
+      // (operação apontada sem peça pronta), não é dado faltando
+      else if(PECA_MAP[r.ordem]){ r.qtde=0; zeroQtde++; }
+      else { r.qtde=0; semQtde++; }         // ordem que nenhum "por Produto" carregado conhece
+    }
+    if(!temLote){
+      const L=LOTE_ORDEM[r.ordem];
+      if(L){ r.lote=L.lote; r.loteDesc=L.desc; comLote++; }
+      else { r.lote=LOTE_DESCONHECIDO; semLote++; }
+    }
+  }
+  return {semQtde, zeroQtde, semLote, comQtde, comLote};
+}
+
+async function processaPdfArquivo(nome, buf, salvar){
+  if(!pdfjsOk()) return false;
+  try{
+    const linhas=await pdfLinhas(new Uint8Array(buf), pdfjsLib);
+    if(!linhas.length){
+      showErr("Este PDF não tem texto pra ler — deve ser digitalizado (imagem) ou protegido. Exporte o relatório direto do sistema (PDF ou .xlsx) em vez de escanear o papel.");
+      return false;
+    }
+    const tipo=pdfDetectaTipo(linhas);
+    if(tipo==="produto"){
+      const R=pdfParaAoaProduto(linhas);
+      const prod=parseProdutoRows(R.rows);
+      if(!prod.n){ setProdInfo("⚠ Achei o “por Produto” no PDF, mas não consegui ler as ordens. Use o .xlsx desse relatório.", true); return false; }
+      applyPeca(prod,{name:nome});
+      if(salvar) guardaProduto(nome,buf);
       return true;
     }
-    RAW_RECS=corteRecs; LAST_PERIOD=period; CORTE_NOME=nome;
-    AGG=aggregate(corteRecs.filter(r=>!OCULTOS.has(r.lote)));
-    document.getElementById("drop").classList.add("hidden");
-    document.getElementById("painel").classList.remove("hidden");
-    document.getElementById("painel").classList.remove("so-fur");   // o Corte chegou: painel completo
-    document.getElementById("filebar").style.display="flex";
-    renderAll(period);
-    if(salvar) guardaCorte(nome,buf);
-    return true;
-  }catch(err){ showErr("Erro ao ler o arquivo: "+err.message); return false; }
+    if(tipo!=="func"){
+      showErr("Não reconheci este PDF. O painel lê os relatórios “Rel Planilhamento por Funcionário” e “Rel Planilhamento por Produto” exportados do sistema — a Programação continua sendo .xlsx.");
+      return false;
+    }
+    const R=pdfParaAoaFunc(linhas);
+    // O parser só fecha a operação quando vê a linha "Lote" (é assim que o relatório escreve).
+    // O PDF de algumas fases não imprime essa linha — aí fechamos a operação com um lote vazio
+    // e o completaRecsDoPdf preenche depois, pelo nº da ORDEM, com o que o painel já sabe.
+    if(!R.temLote) R.rows=pdfFechaOperacoesSemLote(R.rows);
+    const {period,recs}=parseFuncRows(R.rows);
+    if(!recs.length){
+      showErr("Li o PDF mas não achei nenhuma operação nele. Confira se o relatório saiu com as linhas de operação (ORDEM/DATA/MÁQUINA).");
+      return false;
+    }
+    const C=completaRecsDoPdf(recs, R.temQtde, R.temLote);
+    const ok=aplicaRecs(nome, buf, period||R.periodo.texto, recs, salvar);
+    // O que foi completado (e o que não deu) tem que aparecer: número que veio de remendo não
+    // pode passar por número lido do arquivo, e lote que o PDF não traz não pode virar silêncio.
+    const avisos=[];
+    if(!R.temQtde) avisos.push(C.comQtde
+      ? `a coluna <b>QTDE</b> não vem neste PDF — peguei a quantidade no relatório por Produto: <b>${fmt(C.comQtde)}</b> operação(ões) com peça pronta`
+        +(C.zeroQtde?`, <b>${fmt(C.zeroQtde)}</b> apontadas com produção <b>zero</b>`:"")
+        +(C.semQtde?` e <b>${fmt(C.semQtde)}</b> sem correspondência (falta carregar o “por Produto” desse período)`:"")
+      : "a coluna <b>QTDE</b> não vem neste PDF e o relatório por Produto do período não está carregado — <b>as quantidades ficaram zeradas</b>");
+    if(!R.temLote) avisos.push(C.comLote
+      ? `a linha <b>Lote</b> não vem neste PDF: completei pelo nº da ORDEM em <b>${fmt(C.comLote)}</b> operação(ões)`
+        +(C.semLote?` — <b>${fmt(C.semLote)}</b> ficaram em <b>${esc(LOTE_DESCONHECIDO)}</b>`:"")
+      : `a linha <b>Lote</b> não vem neste PDF, então tudo caiu em <b>${esc(LOTE_DESCONHECIDO)}</b> — dá pra ver dia, operador, peça e m², mas <b>não dá pra medir prazo, pulmão nem invasão</b>, que são por lote. `
+        +`Pra ter o lote: exporte o mesmo relatório em <b>.xlsx</b> (o export em planilha traz a linha do lote) ou peça o PDF com essa linha ligada — o do corte já sai assim`);
+    if(avisos.length) showErrHtml("PDF lido, com ressalvas: "+avisos.join(" · ")+"."); else clearErr();
+    return ok;
+  }catch(err){
+    showErr("Erro ao ler o PDF: "+err.message+". Se ele estiver protegido por senha ou for digitalizado, use o .xlsx.");
+    return false;
+  }
 }
 
 /* Na abertura, o painel volta com o último arquivo carregado (Corte + os relatórios por Produto
    que estavam junto). Se der qualquer problema pra ler o que foi guardado, cai no estado vazio
    normal — arrastar o arquivo de novo sempre funciona. */
-function restauraSalvos(){
-  idbGet("corte").then(c=>{
-    if(c&&c.buf && processaArquivo(c.nome, c.buf, false)){
+async function restauraSalvos(){
+  try{
+    const c=await idbGet("corte");
+    if(c&&c.buf && await processaArquivo(c.nome, c.buf, false)){
       ARQ_SALVO={nome:c.nome, quando:c.quando};
       renderSalvoInfo();
     }
-  // os por Produto voltam MESMO SEM o Corte salvo — no modo "só furação" são eles que dão a peça
-  }).then(()=>idbGet("produto")).then(list=>{
-    for(const p of (list||[])){ if(p&&p.buf && processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
+    // os por Produto voltam MESMO SEM o Corte salvo — no modo "só furação" são eles que dão a peça
+    const list=await idbGet("produto");
+    for(const p of (list||[])){ if(p&&p.buf && await processaProdutoBuf(p.nome,p.buf,false)) PROD_BUFS.push(p); }
     renderSalvoInfo();
-  // a furação volta DEPOIS dos por Produto: assim a cobertura de peça já sai certa na tela.
-  // Sem Corte salvo, é aqui que o painel abre no modo "só furação".
-  }).then(()=>idbGet("fur")).then(f=>{
-    if(f&&f.buf && processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
-  }).catch(()=>{});
+    // a furação volta DEPOIS dos por Produto: assim a cobertura de peça já sai certa na tela.
+    // Sem Corte salvo, é aqui que o painel abre no modo "só furação".
+    const f=await idbGet("fur");
+    if(f&&f.buf && await processaArquivo(f.nome, f.buf, false)){ ARQ_FUR={nome:f.nome, quando:f.quando}; renderSalvoInfo(); }
+  }catch(e){}
 }
 
 // aplica as datas da Programação (persiste e re-renderiza).
@@ -3366,6 +4011,10 @@ function setProdInfo(msg, warn){ const e=document.getElementById("prod-info"); i
 // e cobrir toda a janela do relatório de Corte.
 function applyPeca(prod, file){
   let novos=0;
+  // ORDEM+DATA → QTDE PROD. (só serve de remendo pra PDF sem a coluna QTDE): entre arquivos
+  // vale o MAIOR, nunca a soma — dois relatórios do mesmo período (ou de fases diferentes com
+  // a mesma ordem) dobrariam a quantidade se somassem.
+  for(const k in (prod.qprod||{})) PROD_QTDE[k]=Math.max(PROD_QTDE[k]||0, prod.qprod[k]);
   for(const ordem in prod.map){
     const nv=prod.map[ordem], ex=PECA_MAP[ordem];
     if(!ex) novos++;
@@ -3388,7 +4037,7 @@ function applyPeca(prod, file){
     // modo "só furação": a peça/material entra na matriz e no status da furação na hora
     redesenhaTudo(); clearErr();
   } else {
-    showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o relatório do Corte (“Rel Planilhamento por Funcionário”) — as peças aparecem por lote.`);
+    showErr(`Guardei ${prod.n} peças do relatório por Produto. Agora solte aqui o “Rel Planilhamento por Funcionário” (do Corte ou da Furação, .xlsx ou PDF) — as peças aparecem por lote.`);
   }
 }
 // zera as peças carregadas (pra recomeçar com outro conjunto de relatórios por Produto)
@@ -3403,7 +4052,8 @@ function handleProduto(file){
   rdr.onload=ev=>{ processaProdutoBuf(file.name, ev.target.result, true); };
   rdr.readAsArrayBuffer(file);
 }
-function processaProdutoBuf(nome, buf, salvar){
+async function processaProdutoBuf(nome, buf, salvar){
+  if(ehPdf(buf)) return processaPdfArquivo(nome, buf, salvar);
   try{
     const wb=XLSX.read(new Uint8Array(buf),{type:"array"});
     const prod=parseProduto(wb);
