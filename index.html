@@ -431,6 +431,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   /* botão é coisa de tela: o "🖶 ficha" de cada lote não vai pro papel */
   .linkbtn{display:none !important}
   /* modo ficha: só as folhas do lote vão pro papel, o painel inteiro fica fora */
+  /* na tela o body é flex (rodapé grudado embaixo); no papel isso atrapalha a quebra de
+     página: cada folha da ficha virava DUAS, a segunda em branco. No papel, body é bloco. */
+  body{display:block !important}
   body.modo-ficha main,body.modo-ficha header,body.modo-ficha footer{display:none !important}
   body.modo-ficha #ficha{display:block !important}
   /* nada de @page aqui: a regra do topo (A4 paisagem) vale pra ficha também — a tabela é larga
@@ -461,15 +464,15 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha .fx-outras{border:1px solid #111;border-radius:4px;padding:5px 8px;background:#f6f6f6 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .fx-cab .fx-sub{font-family:var(--font-d);font-size:9px;color:#a0aec0;text-transform:uppercase;letter-spacing:1px}
-  .fx-box{display:flex;gap:8px;margin-bottom:10px}
+  .fx-box{display:flex;gap:8px;margin-bottom:7px}
   .fx-card{flex:1;border:1px solid #bbb;border-radius:4px;padding:6px 9px}
   .fx-card .l{font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#666}
   .fx-card .v{font-family:var(--font-d);font-size:17px;font-weight:700;color:#111}
   .fx-alerta{border:1.5px solid #c62828;color:#c62828;font-weight:700}
-  .fx-linha{font-family:var(--font-d);font-size:9.5px;color:#333;margin-bottom:8px;line-height:1.6}
+  .fx-linha{font-family:var(--font-d);font-size:9.5px;color:#333;margin-bottom:5px;line-height:1.5}
   .fx-linha b{color:#111}
   /* larguras travadas: os números e as datas caem sempre na mesma coluna, linha a linha */
-  #ficha table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;margin-top:9px}
+  #ficha table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;margin-top:7px}
   #ficha th{background:#eee !important;color:#111 !important;border:1px solid #bbb;padding:4px 6px;
     font-family:var(--font-d);font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:right}
   #ficha th.l,#ficha td.l{text-align:left}
@@ -496,7 +499,7 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
   #ficha .fx-cob{font-family:var(--font-d);font-size:8px;font-weight:400;color:#666;text-transform:none;letter-spacing:0}
   #ficha .fx-card .l+.v+.l{margin-top:2px}
   #ficha td.ok-box{width:58px;background:#fff}   /* espaço pro operador marcar de caneta */
-  #ficha .fx-rod{margin-top:14px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
+  #ficha .fx-rod{margin-top:10px;display:flex;gap:22px;font-family:var(--font-d);font-size:9px;color:#333}
   #ficha .fx-rod div{flex:1;border-top:1px solid #111;padding-top:3px}
   #ficha .fx-nota{margin-top:10px;font-size:8.5px;color:#666;line-height:1.5;font-family:var(--font-d)}
   /* coluna Ordem: pode ter mais de uma ordem por peça — quebra linha em vez de cortar com “…” */
@@ -545,9 +548,9 @@ footer{padding:16px 20px;text-align:center;color:var(--txt3);font-family:var(--f
     font-family:var(--font-d);font-size:8.5px;color:#333;line-height:1.6}
   .como-print b{color:#111}
   /* modo "só a invasão": imprime o cabeçalho e a seção de invasão, o resto fica fora */
-  body.modo-invasao section:not(#sec-invasao){display:none !important}
+  body.modo-invasao section:not([id$="sec-invasao"]){display:none !important}
   body.modo-invasao .kpis{display:none !important}
-  body.modo-invasao #sec-invasao{break-before:auto;page-break-before:auto}
+  body.modo-invasao [id$="sec-invasao"]{break-before:auto;page-break-before:auto}
   #tbl-peca .peca-lote td{background:#eee !important;color:#111 !important;font-weight:700}
   #tbl-peca .peca-cod{color:#111 !important;font-weight:700}
   #tbl-pecadata .pd-grp td{background:#eee !important;color:#111 !important;font-weight:700}
@@ -1848,11 +1851,14 @@ function renderPrazo(S){
     const desc=(A.loteDescs[lote]||"").replace(/^LT\s?\d+\/\d+\s*/,"");
     const D=diasDoLote(lote, "", S);
     const temMat=materiaisDoLote(lote, S);
+    // as datas são do LOTE INTEIRO: o status herda o material em pior situação, mas "1º" e
+    // "último" têm que bater com a coluna "Dias de …" da mesma linha
+    const dts=datasDoLote(lote, undefined, S);
     h+=`<tr>
       <td class='l'><span class='lote-name'>${esc(lote)}</span><button class='linkbtn oc-btn' data-oc='${esc(lote)}' title='Ocultar este lote do painel INTEIRO (KPIs, matriz, rankings e exports) — dá pra reexibir na barra acima'>✕</button>${desc?`<div class='lote-desc'>${esc(desc)}</div>`:""}</td>
       <td class='num ${A.loteT[lote]?"":"zero"}'>${fmt(A.loteT[lote])}</td>
-      <td class='num'>${dateToBR(s.first)}</td>
-      <td class='num'>${dateToBR(s.last)}</td>
+      <td class='num'>${dateToBR(dts[0]||null)}</td>
+      <td class='num'>${dateToBR(dts[dts.length-1]||null)}</td>
       <td class='l dias-cell'><span class='badge ${D.cls}'>${esc(D.txt)}</span>${D.dist.length>1?`<div class='dias-list'>${D.dist.map(x=>`${esc(x.data.slice(0,5))} <b>${fmt(x.qtde)}</b>`).join(" · ")}</div>`:""}</td>
       ${MATS.map(m=>{ const g=S.meta(lote,m); const pz=isoToDate(g.iso);
         if(!editavel){                                  // furação: data calculada, não digitável
@@ -2138,7 +2144,11 @@ function abrirDetalhe(data, lote, S){
   const A=S.agg();
   const pecas=pecasDoDiaLote(data, lote, S);
   const tot=pecas.reduce((s,p)=>s+p.cortado,0);
-  const g=S.meta(lote), prazo=g.iso?isoToDate(g.iso):null;
+  // a prevista é a do material das peças que estão nesta célula; só cai na do lote (a mais
+  // tarde entre MDF e MDP) quando a célula mistura os dois
+  const matsCel=[...new Set(pecas.map(p=>materialDe(p.desc)).filter(Boolean))];
+  const matCel=matsCel.length===1?matsCel[0]:undefined;
+  const g=S.meta(lote, matCel), prazo=g.iso?isoToDate(g.iso):null;
   MODAL_LOTE=lote; MODAL_SETOR=S;
   // no modo furação os botões de ficha do modal imprimem a ficha DA FURAÇÃO (o rodapé diz qual)
   document.getElementById("modal").classList.toggle("fur", S.id==="fur");
@@ -2147,9 +2157,9 @@ function abrirDetalhe(data, lote, S){
   let sub=`${fmt(tot)} pç · ${pecas.length} peça(s) diferente(s)`;
   if(prazo){
     const d=diasUteisEntre(brToDate(data), prazo);
-    sub += ` · prevista do lote ${dateToBR(prazo)}${S.id==="fur"?" (corte + 1 dia útil)":""}` +
+    sub += ` · prevista ${matCel?"do "+matCel:"do lote"} ${dateToBR(prazo)}${S.id==="fur"?" (corte + 1 dia útil)":""}` +
       (d===0? ` — ${S.v.ac} no dia` : d<0? ` — ${-d} dia(s) útil(eis) ANTES da prevista` : ` — ${d} dia(s) útil(eis) depois da prevista`);
-  } else sub += " · lote sem data prevista";
+  } else sub += matCel?` · ${matCel} sem data prevista`:" · lote sem data prevista";
   const M2=m2DasPecas(pecas);          // área do que saiu neste dia neste lote
   if(M2.m2) sub += ` · ${fmtM2(M2.m2)} m² aqui` + (M2.pct<100?` (de ${fmt(M2.com)} de ${fmt(M2.tot)} pç — as outras não trazem a medida na descrição)`:"");
   const nld=lotesNoDia(data, null, S);
@@ -3247,9 +3257,11 @@ function renderKpis(S){
   let totAnt=0, totComMeta=0;
   for(const x in ANT){ totAnt+=ANT[x].ant; totComMeta+=ANT[x].tot; }
   const pAnt=totComMeta?Math.round(totAnt/totComMeta*100):0;
+  const semLote=A.lotes.indexOf(LOTE_DESCONHECIDO)>=0;
   const cards=[
     {lbl:"Total "+S.v.ac, val:fmt(A.grand), sub:"peças", cls:""},
-    {lbl:"Lotes", val:A.lotes.length, cls:""},
+    {lbl:"Lotes", val:A.lotes.length-(semLote?1:0), sub:semLote?"+ "+LOTE_DESCONHECIDO.toLowerCase():"",
+     cls:semLote?"warn":"", tip:semLote?"O painel só sabe o lote quando o relatório traz. As operações sem lote ficam num balde à parte e não entram nesta contagem.":""},
     {lbl:"Funcionários", val:A.funcs.length, cls:""},
     {lbl:"Dias no arquivo", val:A.datas.length, cls:""},
     {lbl:"Lotes por dia", val:mediaLotes.toLocaleString("pt-BR",{maximumFractionDigits:1}), sub:"média · máx "+maxLotes, cls:""},
@@ -3983,11 +3995,15 @@ function avisoDoPdf(p, C){
       +(C.zeroQtde?`, <b>${fmt(C.zeroQtde)}</b> apontadas com produção <b>zero</b>`:"")
       +(C.semQtde?` e <b>${fmt(C.semQtde)}</b> sem correspondência (falta carregar o “por Produto” desse período)`:"")
     : "a coluna <b>QTDE</b> não vem neste PDF e o relatório por Produto do período não está carregado — <b>as quantidades estão zeradas</b>");
-  if(!p.temLote) partes.push(C.comLote
-    ? `a linha <b>Lote</b> não vem neste PDF: o lote foi recuperado pelo nº da ORDEM em <b>${fmt(C.comLote)}</b> operação(ões)`
-      +(C.semLote?` — <b>${fmt(C.semLote)}</b> ficaram em <b>${esc(LOTE_DESCONHECIDO)}</b>`:"")
-    : `a linha <b>Lote</b> não vem neste PDF, então tudo caiu em <b>${esc(LOTE_DESCONHECIDO)}</b> — dá pra ver dia, operador, peça e m², mas <b>não dá pra medir prazo, pulmão nem invasão</b>, que são por lote. `
-      +`Pra ter o lote: exporte o mesmo relatório em <b>.xlsx</b> (a planilha traz a linha do lote) ou peça o PDF com essa linha ligada — o do corte já sai assim`);
+  if(!p.temLote){
+    const comoTerOLote = `Pra completar o resto: carregue o <b>relatório do Corte do período em que essas peças foram cortadas</b> `
+      +`(o lote vem pelo nº da <b>ORDEM</b>, que é a mesma nas duas fases — o corte do mesmo dia da furação cobre pouco, porque a peça furada hoje foi cortada dias antes), `
+      +`ou exporte a furação em <b>.xlsx</b>, que traz a linha do lote no próprio arquivo.`;
+    partes.push(C.comLote
+      ? `a linha <b>Lote</b> não vem neste PDF: o lote foi recuperado pelo nº da ORDEM em <b>${fmt(C.comLote)}</b> operação(ões)`
+        +(C.semLote?` e <b>${fmt(C.semLote)}</b> ficaram em <b>${esc(LOTE_DESCONHECIDO)}</b>. `+comoTerOLote:"")
+      : `a linha <b>Lote</b> não vem neste PDF, então tudo caiu em <b>${esc(LOTE_DESCONHECIDO)}</b> — dá pra ver dia, operador, peça e m², mas <b>não dá pra medir prazo, pulmão nem invasão</b>, que são por lote. `+comoTerOLote);
+  }
   return partes.length ? "PDF lido, com ressalvas: "+partes.join(" · ")+"." : "";
 }
 
@@ -4081,7 +4097,8 @@ function applyProg(prog, file){
   if(AGG){
     redesenhaTudo();
     let casados=0; for(const l of AGG.lotes){ if(getMeta(l).src) casados++; }
-    setProgInfo(`✓ Programação${file?" ("+file.name+")":""}: ${prog.comMdf} datas de MDF + ${prog.comMdp} de MDP (colunas pelo ${prog.src}) · ${casados}/${AGG.lotes.length} lotes com prazo.`, false);
+    setProgInfo(`${casados?"✓":"⚠"} Programação${file?" ("+file.name+")":""}: ${prog.comMdf} datas de MDF + ${prog.comMdp} de MDP (colunas pelo ${prog.src}) · ${casados}/${AGG.lotes.length} lotes com prazo.`
+      +(casados?"":" Nenhum lote do arquivo aparece nessa Programação — confira se ela é do mesmo período."), !casados);
   } else if(AGGF){
     // modo "só furação": as previstas (corte + 1 dia útil) preenchem na hora com as datas novas
     redesenhaTudo(); clearErr();
@@ -4208,8 +4225,9 @@ function exportCsv(S){
   rows.push(["Lote",S.v.Ac,S.v.pri,S.v.ult,S.v.dias,"Dias parado no meio",S.v.Ac+" em cada dia","Prevista MDF","Prevista MDP","Prazo","Status"]);
   for(const l of A.lotes){
     const s=statusFor(l, undefined, S), D=diasDoLote(l, "", S);
+    const dl=datasDoLote(l, undefined, S);          // datas do lote inteiro (ver renderPrazo)
     const dts=MATS.map(m=>{ const g=S.meta(l,m); return g.iso?dateToBR(isoToDate(g.iso)):""; });
-    rows.push([l, A.loteT[l], dateToBR(s.first), dateToBR(s.last), D.n, D.parados,
+    rows.push([l, A.loteT[l], dateToBR(dl[0]||null), dateToBR(dl[dl.length-1]||null), D.n, D.parados,
                D.dist.map(x=>x.data+": "+x.qtde).join(" | "),
                ...dts, s.delta, s.txt]);
   }
@@ -4258,17 +4276,20 @@ function exportCsv(S){
     rows.push(["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"m² "+S.v.ac,"Medida (C x L mm)","Planejado",S.v.prevCol,S.v.ult,"Máquina","Operador"]);
     const byLote=buildPecaLote(S);
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
-      const g=S.meta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
         const md=medidaDe(p.desc);
+        // a prevista é a do MATERIAL DA PEÇA (MDF corta antes) — é o que a tela e a ficha mostram
+        const gp=S.meta(lote, materialDe(p.desc)||undefined);
+        const progBR=gp.iso?dateToBR(isoToDate(gp.iso)):"";
         rows.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, csvM2(m2DaPeca(p.desc)*p.cortado),
                    md?`${md.c} x ${md.l}`:"", p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
       const R=m2DasPecas(pecas);
+      const gl=S.meta(lote);
       rows.push([lote, "", "(total do lote)", "", pecas.reduce((s,p)=>s+p.cortado,0), csvM2(R.m2),
-                 notaM2(R), pecas.reduce((s,p)=>s+(p.planejado||0),0), "", "", "", ""]);
+                 notaM2(R), pecas.reduce((s,p)=>s+(p.planejado||0),0), gl.iso?dateToBR(isoToDate(gl.iso)):"", "", "", ""]);
     }
     // rastreio da data com a peça: o que saiu em cada dia
     rows.push([]);
@@ -4368,11 +4389,11 @@ function exportPorOperador(S){
     const aoa=[["Lote","Peça (código)","Peça (descrição)","Ordens",S.v.Ac,"Planejado",S.v.prevCol,S.v.ult,"Máquina","Operador"]];
     const byLote=buildPecaLote(S);
     for(const lote of Object.keys(byLote).sort((a,b)=>loteNum(a)-loteNum(b))){
-      const g=S.meta(lote); const progBR=g.iso?dateToBR(isoToDate(g.iso)):"";
       const pecas=Object.values(byLote[lote].pecas).filter(p=>p.cortado>0); ordenaPecas(pecas, p=>p.cortado);
       for(const p of pecas){
         const ult=[...p.datas].map(brToDate).filter(Boolean).sort((a,b)=>a-b).pop();
-        aoa.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, p.planejado, progBR, ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
+        const gp=S.meta(lote, materialDe(p.desc)||undefined);      // prevista do material da peça
+        aoa.push([lote, p.cod, p.desc, ordsStr(p.ords), p.cortado, p.planejado, gp.iso?dateToBR(isoToDate(gp.iso)):"", ult?dateToBR(ult):"", [...p.maqs].join(" / "), [...p.ops].join(" / ")]);
       }
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Peças por lote");
@@ -4599,6 +4620,8 @@ document.querySelectorAll(".btn-print-invasao,#btn-print-invasao").forEach(btn=>
     const n=new Date();
     const dt=String(n.getDate()).padStart(2,"0")+"/"+String(n.getMonth()+1).padStart(2,"0")+"/"+String(n.getFullYear()).slice(-2)+" "+String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
     document.getElementById("ph-meta").textContent=(per?"Período: "+per+" · ":"")+"Gerado em "+dt;
+    const ph=document.getElementById("ph-title"), phAntes=ph?ph.innerHTML:"";
+    if(ph) ph.innerHTML=`Invasão de dias <span>· ${esc(S.nome)}</span>`;   // a folha é só desta seção
     document.body.classList.add("modo-invasao");
     // no papel as peças invasoras saem TODAS abertas (é onde se pega a invasão peça a peça,
     // com ordem e operador) — depois volta pro que estava aberto na tela
@@ -4609,6 +4632,7 @@ document.querySelectorAll(".btn-print-invasao,#btn-print-invasao").forEach(btn=>
     const sel=S.el("inv-lote"), loteSel=sel?sel.value:"";
     document.title=("Invasão de dias"+(S.id==="fur"?" - furação":"")+(loteSel?" "+loteSel:"")+(per?" "+per:"")).replace(/\//g,"-");
     const volta=()=>{ document.body.classList.remove("modo-invasao"); document.title=tituloAntes;
+                      if(ph) ph.innerHTML=phAntes;
                       S.abertos.clear(); abertosAntes.forEach(k=>S.abertos.add(k)); renderInvasao(S);
                       window.removeEventListener("afterprint",volta); };
     window.addEventListener("afterprint",volta);
