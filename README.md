@@ -110,27 +110,37 @@ arrasta o arquivo na tela e o painel monta na hora:
   A leitura da medida segue a convenção `C × L × E` (a espessura é o último número), aguenta o
   material colado no número (`417X14X15MDF7`), vírgula decimal (`1740,5X300X15`) e a forma invertida
   `E × C × L` (`15X2750X1850`).
-- **Furação (aba própria)** — o rastreio das **furadeiras**, no mesmo formato do corte e **sem mexer
-  em nada dele**. Você arrasta na tela o **“Rel Planilhamento por Funcionário” da furação** (o mesmo
-  relatório, exportado do setor das furadeiras) e o painel reconhece sozinho: arquivo com máquina
+- **Furação: o MESMO painel, do lado das furadeiras** — no topo tem um seletor de **setor**
+  (**Corte · seccionadoras** | **Furação · furadeiras**) e as **abas são as mesmas nos dois**:
+  Visão geral, Prazo por lote, Matriz & Funcionário, Peças, Pulmão & Invasão. Trocar de setor troca
+  só a **fonte dos números** — o relatório das seccionadoras ou o das furadeiras. Antes a furação
+  era uma aba menor, com matriz e prazo e mais nada; hoje ela tem **tudo que o corte tem**: os
+  **KPIs** (total furado, lotes por dia, antecipado/pulmão, lotes em +1 dia, lotes que pararam,
+  atrasados, peças e **m² furado**), os **gráficos**, o **filtro por operador e por material**, a
+  coluna **Antecipado (pulmão)** e **Lotes no dia** na matriz, **Por funcionário**, **Peças furadas
+  por lote** e **em cada dia** (com busca, m² e ordenação), **Ranking do pulmão**, **Invasão de
+  dias**, a **ficha de furação** completa (a mesma folha da ficha de corte: m², % no prazo, folhas
+  separadas de MDF e MDP e o aviso do que ficou na outra folha), o **desvio por peça**, o **PDF** do
+  painel e os **exports** `.csv`/`.xlsx` do setor.
+  Isso vale pra frente: corte e furação passam pelo **mesmo código** — o painel recebe o setor e
+  pergunta a ele de onde vêm os números e qual é a data prevista. Não existe mais uma versão
+  "reduzida" da furação pra ficar pra trás.
+  Você arrasta na tela o **“Rel Planilhamento por Funcionário” da furação** (o mesmo relatório,
+  exportado do setor das furadeiras) e o painel reconhece sozinho: arquivo com máquina
   `FUR…`/`FURADEIRA` e **nenhuma seccionadora** é furação inteira (os tornos CNC que vêm no mesmo
   export contam junto, como no corte) — operação de furadeira **nunca entra nos números do corte**.
   A **data prevista da furação é a data de corte do material + 1 dia útil** (MDF corta 17/08 → fura
   18/08 · MDP corta 19/08 → fura 20/08): ela é calculada sozinha da Programação (ou da data manual)
   do corte — não existe planilha nova de datas pra carregar — e sábado/domingo pulam (feriado conta,
-  o painel não tem o calendário da fábrica). A aba traz: **KPIs** (total furado, lotes atrasados vs
-  corte + 1 útil, sem prevista), a **matriz data × lote** com a linha *Prevista MDF/MDP* e a célula
-  do dia-meta marcada (igual à do corte), e o **Prazo de furação por lote** com o status por material
-  na mesma régua do corte (🟢 Adiantado/No dia · 🔴 Atrasado · 🟡 Em andamento, desvios em dias
-  úteis). Carregando **também o “Rel Planilhamento por Produto” da furação** (botão da seção Peças ou
-  arraste — ele soma no mesmo mapa ordem → peça), a quantidade da matriz vira **clicável** e mostra
-  **quais peças foram furadas** naquele dia, e o status separa MDF de MDP. O arquivo da furação
-  também **fica salvo no navegador** e volta sozinho; lote oculto no corte some da furação também.
-  **Funciona sem o relatório do Corte**: quem é do setor das furadeiras arrasta só o arquivo da
-  furação e o painel abre direto na aba Furação (as outras abas ficam apagadas até o Corte ser
-  carregado, porque são montadas a partir dele). Nesse modo dá pra arrastar a **Programação** e o
-  **por Produto** da furação normalmente — previstas e peças preenchem na hora — e tudo volta
-  sozinho na próxima abertura. O PDF sai só com as seções da furação.
+  o painel não tem o calendário da fábrica). Por isso o **Prazo de furação por lote** não tem data
+  pra digitar: cada célula mostra a data e, embaixo, de onde ela saiu (`corte 17/08/26 + 1 útil`).
+  Carregando **também o “Rel Planilhamento por Produto” da furação** (botão da barra da furação ou
+  arraste — ele soma no mesmo mapa ordem → peça), vêm a peça, o material (MDF/MDP) e o m².
+  O arquivo da furação também **fica salvo no navegador** e volta sozinho; lote oculto no corte some
+  da furação também. **Funciona sem o relatório do Corte**: quem é do setor das furadeiras arrasta
+  só o arquivo da furação e o painel abre direto no setor Furação (o setor Corte fica apagado até
+  ele ser carregado, porque é montado a partir dele). O PDF sai só com as seções do setor que está
+  na tela.
 - **O último arquivo fica salvo no navegador** — o relatório de Corte (e os relatórios por Produto
   carregados junto) ficam guardados no **IndexedDB do próprio navegador**, então ao abrir o painel de
   novo ele **volta sozinho**, já processado — sem arrastar o arquivo toda manhã. A barra do topo mostra
