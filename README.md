@@ -155,7 +155,11 @@ Você exporta do sistema o relatório **“Rel Planilhamento por Funcionário”
     operação** — cada apontamento consome uma linha do “por Produto”, de preferência a da mesma
     máquina e operador. É assim, e não pelo total do dia, porque a mesma ordem passa por duas
     furadeiras no mesmo dia: repetir o total inflava a produção.
-  · o **lote** vem de um relatório do mesmo setor já carregado, pelo nº da **ORDEM**.
+  · o **lote** vem de um relatório do mesmo setor já carregado, pelo nº da **ORDEM** — a ordem é a
+    mesma nas duas fases, então **o relatório do Corte é que traz o lote da furação**. Um detalhe que
+    muda o resultado: exporte o Corte do **período em que aquelas peças foram cortadas**, não do
+    mesmo dia da furação — a peça furada hoje foi cortada dias antes, e o corte de um dia só cobre
+    pouca coisa (nos arquivos de exemplo, 24 de 189 apontamentos).
   · a **ordem de carga não importa**: se o “por Produto” (ou o relatório que traz o lote) chegar
     depois, o painel refaz a conta na hora.
   O que não dá pra completar entra como **`SEM LOTE NO PDF`** — e aí dá pra ver dia, operador,
